@@ -90,15 +90,12 @@ const InstanceDetailPage: React.FC<InstanceDetailPageProps> = ({
         setQrCode(response.qrcode);
         setShowQRModal(true);
         onQRCodeUpdated();
-      }
-      
-      // Display success message from response
-      if (response.message) {
-        toast.success(response.message);
+      } else {
+        // No toast here, handled in the API function
       }
     } catch (error) {
       console.error("Error refreshing QR code:", error);
-      // Error toast is handled in the API function
+      // No toast here, handled in the API function
     } finally {
       setIsRefreshing(false);
     }
@@ -107,16 +104,12 @@ const InstanceDetailPage: React.FC<InstanceDetailPageProps> = ({
   const handleDisconnect = async () => {
     setIsDisconnecting(true);
     try {
-      const response = await api.turnOffInstance(locationId, instance.instance_name);
+      await api.turnOffInstance(locationId, instance.instance_name);
+      // No toast here, handled in the API function
       fetchInstanceData();
-      
-      // Display success message from response
-      if (response.message) {
-        toast.success(response.message);
-      }
     } catch (error) {
       console.error("Error disconnecting instance:", error);
-      // Error toast is handled in the API function
+      // No toast here, handled in the API function
     } finally {
       setIsDisconnecting(false);
     }
@@ -124,64 +117,67 @@ const InstanceDetailPage: React.FC<InstanceDetailPageProps> = ({
 
   const handleAddCredential = async (name: string, apiKey: string) => {
     try {
-      const response = await api.createOpenAICredential(instance.instance_name, name, apiKey);
+      await api.createOpenAICredential(instance.instance_name, name, apiKey);
       await fetchOpenAICredentials();
-      
-      // Display success message from response
-      if (response.message) {
-        toast.success(response.message);
-      }
+      // No toast here, handled in the API function
     } catch (error) {
       console.error("Error adding credential:", error);
-      // Error toast is handled in the API function
+      // No toast here, handled in the API function
       throw error;
     }
   };
 
   const handleDeleteCredential = async (credentialId: string) => {
     try {
-      const response = await api.deleteOpenAICredential(instance.instance_name, credentialId);
+      await api.deleteOpenAICredential(instance.instance_name, credentialId);
       await fetchOpenAICredentials();
-      
-      // Display success message from response
-      if (response.message) {
-        toast.success(response.message);
-      }
+      // No toast here, handled in the API function
     } catch (error) {
       console.error("Error deleting credential:", error);
-      // Error toast is handled in the API function
+      // No toast here, handled in the API function
       throw error;
     }
   };
 
-  const handleAddAssistant = async (name: string, instructions: string, apiKeyId: string) => {
+  const handleAddAssistant = async (
+    name: string, 
+    instructions: string, 
+    apiKeyId: string,
+    assistantId: string,
+    webhookUrl: string,
+    triggerType: string,
+    triggerCondition?: string,
+    triggerValue?: string
+  ) => {
     try {
-      const response = await api.createOpenAIAssistant(instance.instance_name, name, instructions, apiKeyId);
+      await api.createOpenAIAssistant(
+        instance.instance_name, 
+        name, 
+        instructions, 
+        apiKeyId,
+        assistantId,
+        webhookUrl,
+        triggerType as any,
+        triggerCondition as any,
+        triggerValue
+      );
       await fetchOpenAIAssistants();
-      
-      // Display success message from response
-      if (response.message) {
-        toast.success(response.message);
-      }
+      // No toast here, handled in the API function
     } catch (error) {
       console.error("Error adding assistant:", error);
-      // Error toast is handled in the API function
+      // No toast here, handled in the API function
       throw error;
     }
   };
 
   const handleDeleteAssistant = async (assistantId: string) => {
     try {
-      const response = await api.deleteOpenAIAssistant(instance.instance_name, assistantId);
+      await api.deleteOpenAIAssistant(instance.instance_name, assistantId);
       await fetchOpenAIAssistants();
-      
-      // Display success message from response
-      if (response.message) {
-        toast.success(response.message);
-      }
+      // No toast here, handled in the API function
     } catch (error) {
       console.error("Error deleting assistant:", error);
-      // Error toast is handled in the API function
+      // No toast here, handled in the API function
     }
   };
 

@@ -70,7 +70,15 @@ export interface OpenAIAssistant {
   apiKeyId: string;
   createdAt: string;
   updatedAt: string;
+  assistantId?: string;
+  webhookUrl?: string;
+  triggerType?: TriggerType;
+  triggerCondition?: TriggerCondition;
+  triggerValue?: string;
 }
+
+export type TriggerType = 'keyword' | 'all' | 'none' | 'advanced';
+export type TriggerCondition = 'contains' | 'equals' | 'startsWith' | 'endsWith' | 'regex';
 
 // ... resto de las interfaces existentes ...
 // InstanceData,

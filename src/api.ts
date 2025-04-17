@@ -6,6 +6,8 @@ import {
   InstanceConfig,
   OpenAICredential,
   OpenAIAssistant,
+  TriggerType,
+  TriggerCondition,
   // InstanceData,
   // APIResponse,
   // ListInstancesResponse,
@@ -78,7 +80,9 @@ export const createInstance = async (
       }),
     });
     
-    // No toast here - let the component handle it
+    if (response.data && response.data.message) {
+      toast.success(response.data.message);
+    }
     
     return response.data;
   } catch (error) {
@@ -106,7 +110,9 @@ export const refreshQRCode = async (
       instanceName,
     });
     
-    // No toast here - let the component handle it
+    if (response.data && response.data.message) {
+      toast.success(response.data.message);
+    }
     
     return response.data;
   } catch (error) {
@@ -134,7 +140,9 @@ export const deleteInstance = async (
       },
     });
     
-    // No toast here - let the component handle it
+    if (response.data && response.data.message) {
+      toast.success(response.data.message);
+    }
     
     return response.data;
   } catch (error) {
@@ -180,7 +188,9 @@ export const turnOffInstance = async (
       instanceName,
     });
     
-    // No toast here - let the component handle it
+    if (response.data && response.data.message) {
+      toast.success(response.data.message);
+    }
     
     return response.data;
   } catch (error) {
@@ -212,7 +222,9 @@ export const editInstance = async (
       active_ia: config.active_ia,
     });
     
-    // No toast here - let the component handle it
+    if (response.data && response.data.message) {
+      toast.success(response.data.message);
+    }
     
     return response.data;
   } catch (error) {
@@ -291,7 +303,9 @@ export const createOpenAICredential = async (
       apikey: apiKey
     });
     
-    // No toast here - let the component handle it
+    if (response.data && response.data.message) {
+      toast.success(response.data.message);
+    }
     
     return response.data;
   } catch (error) {
@@ -321,7 +335,9 @@ export const deleteOpenAICredential = async (
       }
     });
     
-    // No toast here - let the component handle it
+    if (response.data && response.data.message) {
+      toast.success(response.data.message);
+    }
     
     return response.data;
   } catch (error) {
@@ -363,17 +379,35 @@ export const createOpenAIAssistant = async (
   instanceName: string,
   name: string,
   instructions: string,
-  apiKeyId: string
+  apiKeyId: string,
+  assistantId: string,
+  webhookUrl: string,
+  triggerType: TriggerType,
+  triggerCondition?: TriggerCondition,
+  triggerValue?: string
 ) => {
   try {
-    const response = await axios.post(`${OPENAI_BASE_URL}/assistants`, {
+    const payload: any = {
       instance_name: instanceName,
       name,
       instructions,
-      apikey_id: apiKeyId
-    });
+      apikey_id: apiKeyId,
+      assistant_id: assistantId,
+      webhook_url: webhookUrl,
+      trigger_type: triggerType
+    };
+
+    // Solo incluir condición y valor si el tipo de disparador lo requiere
+    if (triggerType === 'keyword' || triggerType === 'advanced') {
+      payload.trigger_condition = triggerCondition;
+      payload.trigger_value = triggerValue;
+    }
+
+    const response = await axios.post(`${OPENAI_BASE_URL}/assistants`, payload);
     
-    // No toast here - let the component handle it
+    if (response.data && response.data.message) {
+      toast.success(response.data.message);
+    }
     
     return response.data;
   } catch (error) {
@@ -400,7 +434,9 @@ export const deleteOpenAIAssistant = async (
       params: { instance_name: instanceName }
     });
     
-    // No toast here - let the component handle it
+    if (response.data && response.data.message) {
+      toast.success(response.data.message);
+    }
     
     return response.data;
   } catch (error) {
