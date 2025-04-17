@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { X, Loader2, HelpCircle, Info, ExternalLink } from "lucide-react";
-import { OpenAIAssistant } from "../types";
 
 interface ApiKeyOption {
   id: string;
@@ -33,7 +32,6 @@ interface OpenAIAssistantModalProps {
   instanceName: string;
   apiKeys: ApiKeyOption[];
   isLoading?: boolean;
-  assistant?: OpenAIAssistant | null;
 }
 
 const OpenAIAssistantModal: React.FC<OpenAIAssistantModalProps> = ({
@@ -43,7 +41,6 @@ const OpenAIAssistantModal: React.FC<OpenAIAssistantModalProps> = ({
   instanceName,
   apiKeys,
   isLoading = false,
-  assistant = null,
 }) => {
   // Campos básicos
   const [name, setName] = useState("");
@@ -70,57 +67,34 @@ const OpenAIAssistantModal: React.FC<OpenAIAssistantModalProps> = ({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState<'basic' | 'advanced'>('basic');
 
-  // Resetear los campos cuando se abre el modal o cambia el asistente
+  // Resetear los campos cuando se abre el modal
   useEffect(() => {
     if (isOpen) {
-      if (assistant) {
-        // Si hay un asistente, llenar los campos con sus datos
-        setName(assistant.name || "");
-        setApiKeyId(assistant.apiKeyId || "");
-        setAssistantId(assistant.assistantId || "");
-        setWebhookUrl(assistant.webhookUrl || "");
-        setTriggerType(assistant.triggerType || "all");
-        setTriggerCondition(assistant.triggerCondition || "contains");
-        setTriggerValue(assistant.triggerValue || "");
-        
-        // Campos adicionales
-        setExpirationMinutes(assistant.expirationMinutes || 60);
-        setStopKeyword(assistant.stopKeyword || "#stop");
-        setMessageDelayMs(assistant.messageDelayMs || 1500);
-        setUnknownMessage(assistant.unknownMessage || "No puedo entender aún este tipo de mensajes");
-        setListenToOwner(assistant.listenToOwner || false);
-        setStopByOwner(assistant.stopByOwner !== undefined ? assistant.stopByOwner : true);
-        setKeepSessionOpen(assistant.keepSessionOpen !== undefined ? assistant.keepSessionOpen : true);
-        setDebounceSeconds(assistant.debounceSeconds || 6);
-        setSeparateMessages(assistant.separateMessages !== undefined ? assistant.separateMessages : true);
-        setSecondsPerMessage(assistant.secondsPerMessage || 1);
-      } else {
-        // Si no hay asistente, usar valores predeterminados
-        setName("");
-        setApiKeyId("");
-        setAssistantId("");
-        setWebhookUrl("");
-        setTriggerType("all");
-        setTriggerCondition("contains");
-        setTriggerValue("");
-        
-        // Campos adicionales con valores predeterminados
-        setExpirationMinutes(60);
-        setStopKeyword("#stop");
-        setMessageDelayMs(1500);
-        setUnknownMessage("No puedo entender aún este tipo de mensajes");
-        setListenToOwner(false);
-        setStopByOwner(true);
-        setKeepSessionOpen(true);
-        setDebounceSeconds(6);
-        setSeparateMessages(true);
-        setSecondsPerMessage(1);
-      }
+      // Campos básicos
+      setName("");
+      setApiKeyId("");
+      setAssistantId("");
+      setWebhookUrl("");
+      setTriggerType("all");
+      setTriggerCondition("contains");
+      setTriggerValue("");
+      
+      // Campos adicionales con valores predeterminados actualizados
+      setExpirationMinutes(60);
+      setStopKeyword("#stop");
+      setMessageDelayMs(1500);
+      setUnknownMessage("No puedo entender aún este tipo de mensajes");
+      setListenToOwner(false);
+      setStopByOwner(true);
+      setKeepSessionOpen(true);
+      setDebounceSeconds(6);
+      setSeparateMessages(true);
+      setSecondsPerMessage(1);
       
       setErrors({});
       setActiveTab('basic');
     }
-  }, [isOpen, assistant]);
+  }, [isOpen]);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -208,7 +182,7 @@ const OpenAIAssistantModal: React.FC<OpenAIAssistantModalProps> = ({
       <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-xl font-semibold text-purple-900">
-            {assistant ? "Editar Asistente de OpenAI" : "Crear Asistente de OpenAI"}
+            Crear Asistente de OpenAI
           </h3>
           <button
             onClick={onClose}
