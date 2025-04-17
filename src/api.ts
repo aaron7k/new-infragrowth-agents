@@ -404,6 +404,54 @@ export const getOpenAIAssistants = async (instanceName: string): Promise<OpenAIA
   }
 };
 
+// Obtener un asistente específico por su ID
+export const getOpenAIAssistant = async (instanceName: string, assistantId: string): Promise<OpenAIAssistant | null> => {
+  try {
+    const response = await axios.get(`${OPENAI_BASE_URL}/assistant/${assistantId}`, {
+      params: { instance_name: instanceName }
+    });
+    
+    if (response.data && response.data.data) {
+      const assistant = response.data.data;
+      return {
+        id: assistant.id,
+        name: assistant.description || "Sin nombre",
+        instructions: "",
+        apiKeyId: assistant.openaiCredsId,
+        createdAt: assistant.createdAt,
+        updatedAt: assistant.updatedAt,
+        assistantId: assistant.assistantId,
+        webhookUrl: assistant.functionUrl,
+        triggerType: assistant.triggerType as TriggerType,
+        triggerCondition: assistant.triggerOperator as TriggerCondition,
+        triggerValue: assistant.triggerValue,
+        expirationMinutes: assistant.expire,
+        stopKeyword: assistant.keywordFinish,
+        messageDelayMs: assistant.delayMessage,
+        unknownMessage: assistant.unknownMessage,
+        listenToOwner: assistant.listeningFromMe,
+        stopByOwner: assistant.stopBotFromMe,
+        keepSessionOpen: assistant.keepOpen,
+        debounceSeconds: assistant.debounceTime,
+        separateMessages: assistant.splitMessages,
+        secondsPerMessage: assistant.timePerChar / 10
+      };
+    }
+    
+    return null;
+  } catch (error) {
+    if (error instanceof Error) {
+      console.error("Error fetching OpenAI assistant:", error.message);
+    }
+    
+    if (axios.isAxiosError(error) && error.response?.data?.message) {
+      toast.error(error.response.data.message);
+    }
+    
+    return null;
+  }
+};
+
 export const createOpenAIAssistant = async (
   instanceName: string,
   name: string,
@@ -476,6 +524,79 @@ export const createOpenAIAssistant = async (
   }
 };
 
+export const updateOpenAIAssistant = async (
+  instanceName: string,
+  assistantId: string,
+  name: string,
+  instructions: string,
+  apiKeyId: string,
+  openaiAssistantId: string,
+  webhookUrl: string,
+  triggerType: TriggerType,
+  triggerCondition?: TriggerCondition,
+  triggerValue?: string,
+  expirationMinutes?: number,
+  stopKeyword?: string,
+  messageDelayMs?: number,
+  unknownMessage?: string,
+  listenToOwner?: boolean,
+  stopByOwner?: boolean,
+  keepSessionOpen?: boolean,
+  debounceSeconds?: number,
+  separateMessages?: boolean,
+  secondsPerMessage?: number
+) => {
+  try {
+    const payload: any = {
+      instance_name: instanceName,
+      description: name,
+      openaiCredsId: apiKeyId,
+      assistantId: openaiAssistantId,
+      functionUrl: webhookUrl,
+      triggerType: triggerType,
+      botType: "assistant"
+    };
+
+    // Solo incluir condición y valor si el tipo de disparador lo requiere
+    if (triggerType === 'keyword' || triggerType === 'advanced') {
+      payload.triggerOperator = triggerCondition;
+      payload.triggerValue = triggerValue;
+    }
+
+    // Incluir todas las configuraciones avanzadas
+    if (expirationMinutes !== undefined) payload.expire = expirationMinutes;
+    if (stopKeyword !== undefined) payload.keywordFinish = stopKeyword;
+    if (messageDelayMs !== undefined) payload.delayMessage = messageDelayMs;
+    if (unknownMessage !== undefined) payload.unknownMessage = unknownMessage;
+    if (listenToOwner !== undefined) payload.listeningFromMe = listenToOwner;
+    if (stopByOwner !== undefined) payload.stopBotFromMe = stopByOwner;
+    if (keepSessionOpen !== undefined) payload.keepOpen = keepSessionOpen;
+    if (debounceSeconds !== undefined) payload.debounceTime = debounceSeconds;
+    if (separateMessages !== undefined) payload.splitMessages = separateMessages;
+    if (secondsPerMessage !== undefined) payload.timePerChar = secondsPerMessage * 10;
+
+    const response = await axios.put(`${OPENAI_BASE_URL}/assistants/${assistantId}`, payload);
+    
+    if (response.data && response.data.message) {
+      toast.success(response.data.message);
+    }
+    
+    return response.data;
+  } catch (error) {
+    if (error instanceof Error) {
+      console.error("Error updating OpenAI assistant:", error.message);
+    }
+    
+    if (axios.isAxiosError(error) && error.response?.data?.message) {
+      toast.error(error.response.data.message);
+    } else {
+      toast.error("Error al actualizar el asistente de OpenAI");
+    }
+    
+    throw error;
+  }
+};
+
 export const deleteOpenAIAssistant = async (
   instanceName: string,
   assistantId: string
@@ -520,7 +641,9 @@ const api = {
   createOpenAICredential,
   deleteOpenAICredential,
   getOpenAIAssistants,
+  getOpenAIAssistant,
   createOpenAIAssistant,
+  updateOpenAIAssistant,
   deleteOpenAIAssistant
 };
 

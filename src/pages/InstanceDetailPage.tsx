@@ -1,95 +1,131 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { ArrowLeft, RefreshCw, Power, Loader2 } from "lucide-react";
-import { toast } from "react-hot-toast";
-import QRCodeModal from "../components/QRCodeModal";
+import { useParams, useNavigate } from "react-router-dom";
+import {
+  ArrowLeft,
+  RefreshCw,
+  Loader2,
+  Power,
+} from "lucide-react";
 import api from "../api";
 import { WhatsAppInstance, OpenAICredential, OpenAIAssistant } from "../types";
+import QRCodeModal from "../components/QRCodeModal";
 import OpenAICredentialModal from "../components/OpenAICredentialModal";
 import OpenAICredentialsList from "../components/OpenAICredentialsList";
 import OpenAIAssistantModal from "../components/OpenAIAssistantModal";
 import OpenAIAssistantsList from "../components/OpenAIAssistantsList";
 
 interface InstanceDetailPageProps {
-  instance: WhatsAppInstance;
   locationId: string;
-  onGoBack: () => void;
-  onQRCodeUpdated: () => void;
 }
 
 const InstanceDetailPage: React.FC<InstanceDetailPageProps> = ({
-  instance,
   locationId,
-  onGoBack,
-  onQRCodeUpdated,
 }) => {
+  const { instanceId } = useParams<{ instanceId: string }>();
+  const navigate = useNavigate();
+
+  const [instance, setInstance] = useState<WhatsAppInstance | null>(null);
   const [instanceData, setInstanceData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
   const [qrCode, setQrCode] = useState("");
+  
+  // Estado para credenciales de OpenAI
   const [openAICredentials, setOpenAICredentials] = useState<OpenAICredential | null>(null);
   const [isLoadingCredentials, setIsLoadingCredentials] = useState(false);
   const [showCredentialModal, setShowCredentialModal] = useState(false);
   
-  // OpenAI Assistants state
+  // Estado para asistentes de OpenAI
   const [openAIAssistants, setOpenAIAssistants] = useState<OpenAIAssistant[]>([]);
   const [isLoadingAssistants, setIsLoadingAssistants] = useState(false);
   const [showAssistantModal, setShowAssistantModal] = useState(false);
+  const [currentAssistant, setCurrentAssistant] = useState<OpenAIAssistant | null>(null);
+  const [isLoadingAssistantDetails, setIsLoadingAssistantDetails] = useState(false);
 
-  const fetchInstanceData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const data = await api.getInstanceData(locationId, instance.instance_name);
-      console.log("Instance data:", data);
-      setInstanceData(data);
-    } catch (error) {
-      console.error("Error fetching instance data:", error);
-    } finally {
-      setIsLoading(false);
+  useEffect(() => {
+    const fetchInstanceDetails = async () => {
+      if (!instanceId) return;
+
+      setIsLoading(true);
+      try {
+        const instances = await api.listInstances(locationId);
+        const foundInstance = instances.find(
+          (inst) => inst.id === instanceId
+        );
+
+        if (foundInstance) {
+          setInstance(foundInstance);
+          const data = await api.getInstanceData(
+            locationId,
+            foundInstance.instance_name
+          );
+          setInstanceData(data);
+        } else {
+          navigate("/");
+        }
+      } catch (error) {
+        console.error("Error fetching instance details:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchInstanceDetails();
+  }, [instanceId, locationId, navigate]);
+
+  useEffect(() => {
+    if (instance) {
+      fetchOpenAICredentials();
+      fetchOpenAIAssistants();
     }
-  }, [locationId, instance.instance_name]);
+  }, [instance]);
 
-  const fetchOpenAICredentials = useCallback(async () => {
+  const fetchOpenAICredentials = async () => {
+    if (!instance) return;
+    
     setIsLoadingCredentials(true);
     try {
       const credentials = await api.getOpenAICredentials(instance.instance_name);
       setOpenAICredentials(credentials);
     } catch (error) {
       console.error("Error fetching OpenAI credentials:", error);
-      setOpenAICredentials(null);
     } finally {
       setIsLoadingCredentials(false);
     }
-  }, [instance.instance_name]);
+  };
 
-  const fetchOpenAIAssistants = useCallback(async () => {
+  const fetchOpenAIAssistants = async () => {
+    if (!instance) return;
+    
     setIsLoadingAssistants(true);
     try {
       const assistants = await api.getOpenAIAssistants(instance.instance_name);
       setOpenAIAssistants(assistants);
     } catch (error) {
       console.error("Error fetching OpenAI assistants:", error);
-      setOpenAIAssistants([]);
     } finally {
       setIsLoadingAssistants(false);
     }
-  }, [instance.instance_name]);
+  };
 
-  useEffect(() => {
-    fetchInstanceData();
-    fetchOpenAICredentials();
-    fetchOpenAIAssistants();
-  }, [fetchInstanceData, fetchOpenAICredentials, fetchOpenAIAssistants]);
+  const onGoBack = () => {
+    navigate("/");
+  };
 
   const handleRefreshQR = async () => {
+    if (!instance) return;
+
     setIsRefreshing(true);
     try {
-      const response = await api.refreshQRCode(locationId, instance.instance_name);
+      const response = await api.refreshQRCode(
+        locationId,
+        instance.instance_name
+      );
       if (response.qrcode) {
         setQrCode(response.qrcode);
         setShowQRModal(true);
-        onQRCodeUpdated();
       }
     } catch (error) {
       console.error("Error refreshing QR code:", error);
@@ -99,10 +135,14 @@ const InstanceDetailPage: React.FC<InstanceDetailPageProps> = ({
   };
 
   const handleDisconnect = async () => {
+    if (!instance) return;
+
     setIsDisconnecting(true);
     try {
       await api.turnOffInstance(locationId, instance.instance_name);
-      fetchInstanceData();
+      // Actualizar el estado de la instancia después de desconectar
+      const data = await api.getInstanceData(locationId, instance.instance_name);
+      setInstanceData(data);
     } catch (error) {
       console.error("Error disconnecting instance:", error);
     } finally {
@@ -110,7 +150,20 @@ const InstanceDetailPage: React.FC<InstanceDetailPageProps> = ({
     }
   };
 
+  const onQRCodeUpdated = async () => {
+    if (!instance) return;
+    
+    try {
+      const data = await api.getInstanceData(locationId, instance.instance_name);
+      setInstanceData(data);
+    } catch (error) {
+      console.error("Error updating instance data:", error);
+    }
+  };
+
   const handleAddCredential = async (name: string, apiKey: string) => {
+    if (!instance) return;
+    
     try {
       await api.createOpenAICredential(instance.instance_name, name, apiKey);
       await fetchOpenAICredentials();
@@ -121,18 +174,44 @@ const InstanceDetailPage: React.FC<InstanceDetailPageProps> = ({
   };
 
   const handleDeleteCredential = async (credentialId: string) => {
+    if (!instance) return;
+    
     try {
       await api.deleteOpenAICredential(instance.instance_name, credentialId);
       await fetchOpenAICredentials();
     } catch (error) {
       console.error("Error deleting credential:", error);
-      throw error;
+    }
+  };
+
+  const handleEditAssistant = async (assistant: OpenAIAssistant) => {
+    if (!instance) return;
+    
+    setIsLoadingAssistantDetails(true);
+    try {
+      // Obtener los detalles completos del asistente
+      const assistantDetails = await api.getOpenAIAssistant(instance.instance_name, assistant.id);
+      if (assistantDetails) {
+        setCurrentAssistant(assistantDetails);
+        setShowAssistantModal(true);
+      } else {
+        // Si no se pudo obtener los detalles, usar los datos básicos
+        setCurrentAssistant(assistant);
+        setShowAssistantModal(true);
+      }
+    } catch (error) {
+      console.error("Error fetching assistant details:", error);
+      // En caso de error, usar los datos básicos
+      setCurrentAssistant(assistant);
+      setShowAssistantModal(true);
+    } finally {
+      setIsLoadingAssistantDetails(false);
     }
   };
 
   const handleAddAssistant = async (
-    name: string, 
-    instructions: string, 
+    name: string,
+    instructions: string,
     apiKeyId: string,
     assistantId: string,
     webhookUrl: string,
@@ -150,42 +229,80 @@ const InstanceDetailPage: React.FC<InstanceDetailPageProps> = ({
     separateMessages?: boolean,
     secondsPerMessage?: number
   ) => {
+    if (!instance) return;
+    
     try {
-      await api.createOpenAIAssistant(
-        instance.instance_name, 
-        name, 
-        instructions, 
-        apiKeyId,
-        assistantId,
-        webhookUrl,
-        triggerType as any,
-        triggerCondition as any,
-        triggerValue,
-        expirationMinutes,
-        stopKeyword,
-        messageDelayMs,
-        unknownMessage,
-        listenToOwner,
-        stopByOwner,
-        keepSessionOpen,
-        debounceSeconds,
-        separateMessages,
-        secondsPerMessage
-      );
+      if (currentAssistant) {
+        // Actualizar asistente existente
+        await api.updateOpenAIAssistant(
+          instance.instance_name,
+          currentAssistant.id,
+          name,
+          instructions,
+          apiKeyId,
+          assistantId,
+          webhookUrl,
+          triggerType as any,
+          triggerCondition as any,
+          triggerValue,
+          expirationMinutes,
+          stopKeyword,
+          messageDelayMs,
+          unknownMessage,
+          listenToOwner,
+          stopByOwner,
+          keepSessionOpen,
+          debounceSeconds,
+          separateMessages,
+          secondsPerMessage
+        );
+      } else {
+        // Crear nuevo asistente
+        await api.createOpenAIAssistant(
+          instance.instance_name,
+          name,
+          instructions,
+          apiKeyId,
+          assistantId,
+          webhookUrl,
+          triggerType as any,
+          triggerCondition as any,
+          triggerValue,
+          expirationMinutes,
+          stopKeyword,
+          messageDelayMs,
+          unknownMessage,
+          listenToOwner,
+          stopByOwner,
+          keepSessionOpen,
+          debounceSeconds,
+          separateMessages,
+          secondsPerMessage
+        );
+      }
+      
+      setCurrentAssistant(null);
       await fetchOpenAIAssistants();
     } catch (error) {
-      console.error("Error adding assistant:", error);
+      console.error("Error adding/editing assistant:", error);
       throw error;
     }
   };
 
   const handleDeleteAssistant = async (assistantId: string) => {
+    if (!instance) return;
+    
     try {
       await api.deleteOpenAIAssistant(instance.instance_name, assistantId);
       await fetchOpenAIAssistants();
     } catch (error) {
       console.error("Error deleting assistant:", error);
     }
+  };
+
+  const handleCloseAssistantModal = () => {
+    setShowAssistantModal(false);
+    setCurrentAssistant(null);
   };
 
   // Verificar si la instancia está conectada basado en el estado "open"
@@ -201,7 +318,7 @@ const InstanceDetailPage: React.FC<InstanceDetailPageProps> = ({
           <ArrowLeft className="w-6 h-6 text-purple-700" />
         </button>
         <h1 className="text-2xl font-bold text-purple-900">
-          {instance.instance_alias}
+          {instance?.instance_alias}
         </h1>
       </div>
 
@@ -236,12 +353,12 @@ const InstanceDetailPage: React.FC<InstanceDetailPageProps> = ({
               <div className="w-full max-w-md space-y-4">
                 <div className="text-center">
                   <p className="text-sm text-gray-500">Nombre de la instancia</p>
-                  <p className="font-medium">{instance.instance_name}</p>
+                  <p className="font-medium">{instance?.instance_name}</p>
                 </div>
                 
                 <div className="text-center">
                   <p className="text-sm text-gray-500">Alias</p>
-                  <p className="font-medium">{instance.instance_alias}</p>
+                  <p className="font-medium">{instance?.instance_alias}</p>
                 </div>
                 
                 <div className="text-center">
@@ -301,9 +418,13 @@ const InstanceDetailPage: React.FC<InstanceDetailPageProps> = ({
           {/* Asistentes de OpenAI */}
           <OpenAIAssistantsList
             assistants={openAIAssistants}
-            onAddAssistant={() => setShowAssistantModal(true)}
+            onAddAssistant={() => {
+              setCurrentAssistant(null);
+              setShowAssistantModal(true);
+            }}
             onDeleteAssistant={handleDeleteAssistant}
-            isLoading={isLoadingAssistants}
+            onEditAssistant={handleEditAssistant}
+            isLoading={isLoadingAssistants || isLoadingAssistantDetails}
           />
         </div>
       </div>
@@ -313,7 +434,7 @@ const InstanceDetailPage: React.FC<InstanceDetailPageProps> = ({
         isOpen={showQRModal}
         onClose={() => setShowQRModal(false)}
         qrCode={qrCode}
-        instanceName={instance.instance_name}
+        instanceName={instance?.instance_name || ""}
         locationId={locationId}
         onQRCodeUpdated={(newQrCode) => {
           setQrCode(newQrCode);
@@ -326,17 +447,18 @@ const InstanceDetailPage: React.FC<InstanceDetailPageProps> = ({
         isOpen={showCredentialModal}
         onClose={() => setShowCredentialModal(false)}
         onSave={handleAddCredential}
-        instanceName={instance.instance_name}
+        instanceName={instance?.instance_name || ""}
       />
 
-      {/* Modal para añadir asistente de OpenAI */}
+      {/* Modal para añadir/editar asistente de OpenAI */}
       <OpenAIAssistantModal
         isOpen={showAssistantModal}
-        onClose={() => setShowAssistantModal(false)}
+        onClose={handleCloseAssistantModal}
         onSave={handleAddAssistant}
-        instanceName={instance.instance_name}
+        instanceName={instance?.instance_name || ""}
         apiKeys={(openAICredentials?.apiKeys || []).map(key => ({ id: key.id, name: key.name }))}
-        isLoading={isLoadingCredentials}
+        isLoading={isLoadingAssistantDetails}
+        assistant={currentAssistant}
       />
     </div>
   );
