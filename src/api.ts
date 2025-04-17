@@ -361,7 +361,36 @@ export const getOpenAIAssistants = async (instanceName: string): Promise<OpenAIA
     const response = await axios.get(`${OPENAI_BASE_URL}/assistants`, {
       params: { instance_name: instanceName }
     });
-    return response.data.assistants || [];
+    
+    // Verificar si la respuesta contiene la propiedad 'data'
+    if (response.data && Array.isArray(response.data.data)) {
+      // Mapear los datos del API a nuestra estructura OpenAIAssistant
+      return response.data.data.map((assistant: any) => ({
+        id: assistant.id,
+        name: assistant.description || "Sin nombre", // Usando description como nombre
+        instructions: "", // Ya no se usa
+        apiKeyId: assistant.openaiCredsId,
+        createdAt: assistant.createdAt,
+        updatedAt: assistant.updatedAt,
+        assistantId: assistant.assistantId,
+        webhookUrl: assistant.functionUrl,
+        triggerType: assistant.triggerType as TriggerType,
+        triggerCondition: assistant.triggerOperator as TriggerCondition,
+        triggerValue: assistant.triggerValue,
+        expirationMinutes: assistant.expire,
+        stopKeyword: assistant.keywordFinish,
+        messageDelayMs: assistant.delayMessage,
+        unknownMessage: assistant.unknownMessage,
+        listenToOwner: assistant.listeningFromMe,
+        stopByOwner: assistant.stopBotFromMe,
+        keepSessionOpen: assistant.keepOpen,
+        debounceSeconds: assistant.debounceTime,
+        separateMessages: assistant.splitMessages,
+        secondsPerMessage: assistant.timePerChar / 10 // Convertir timePerChar a segundos por mensaje
+      }));
+    }
+    
+    return [];
   } catch (error) {
     if (error instanceof Error) {
       console.error("Error fetching OpenAI assistants:", error.message);
@@ -384,24 +413,46 @@ export const createOpenAIAssistant = async (
   webhookUrl: string,
   triggerType: TriggerType,
   triggerCondition?: TriggerCondition,
-  triggerValue?: string
+  triggerValue?: string,
+  expirationMinutes?: number,
+  stopKeyword?: string,
+  messageDelayMs?: number,
+  unknownMessage?: string,
+  listenToOwner?: boolean,
+  stopByOwner?: boolean,
+  keepSessionOpen?: boolean,
+  debounceSeconds?: number,
+  separateMessages?: boolean,
+  secondsPerMessage?: number
 ) => {
   try {
     const payload: any = {
       instance_name: instanceName,
-      name,
-      instructions,
-      apikey_id: apiKeyId,
-      assistant_id: assistantId,
-      webhook_url: webhookUrl,
-      trigger_type: triggerType
+      description: name, // Usar name como description
+      openaiCredsId: apiKeyId,
+      assistantId: assistantId,
+      functionUrl: webhookUrl,
+      triggerType: triggerType,
+      botType: "assistant"
     };
 
     // Solo incluir condición y valor si el tipo de disparador lo requiere
     if (triggerType === 'keyword' || triggerType === 'advanced') {
-      payload.trigger_condition = triggerCondition;
-      payload.trigger_value = triggerValue;
+      payload.triggerOperator = triggerCondition;
+      payload.triggerValue = triggerValue;
     }
+
+    // Incluir todas las configuraciones avanzadas
+    if (expirationMinutes !== undefined) payload.expire = expirationMinutes;
+    if (stopKeyword !== undefined) payload.keywordFinish = stopKeyword;
+    if (messageDelayMs !== undefined) payload.delayMessage = messageDelayMs;
+    if (unknownMessage !== undefined) payload.unknownMessage = unknownMessage;
+    if (listenToOwner !== undefined) payload.listeningFromMe = listenToOwner;
+    if (stopByOwner !== undefined) payload.stopBotFromMe = stopByOwner;
+    if (keepSessionOpen !== undefined) payload.keepOpen = keepSessionOpen;
+    if (debounceSeconds !== undefined) payload.debounceTime = debounceSeconds;
+    if (separateMessages !== undefined) payload.splitMessages = separateMessages;
+    if (secondsPerMessage !== undefined) payload.timePerChar = secondsPerMessage * 10; // Convertir segundos por mensaje a timePerChar
 
     const response = await axios.post(`${OPENAI_BASE_URL}/assistants`, payload);
     

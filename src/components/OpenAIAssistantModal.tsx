@@ -44,7 +44,6 @@ const OpenAIAssistantModal: React.FC<OpenAIAssistantModalProps> = ({
 }) => {
   // Campos básicos
   const [name, setName] = useState("");
-  const [instructions, setInstructions] = useState("");
   const [apiKeyId, setApiKeyId] = useState("");
   const [assistantId, setAssistantId] = useState("");
   const [webhookUrl, setWebhookUrl] = useState("");
@@ -73,7 +72,6 @@ const OpenAIAssistantModal: React.FC<OpenAIAssistantModalProps> = ({
     if (isOpen) {
       // Campos básicos
       setName("");
-      setInstructions("");
       setApiKeyId("");
       setAssistantId("");
       setWebhookUrl("");
@@ -148,9 +146,10 @@ const OpenAIAssistantModal: React.FC<OpenAIAssistantModalProps> = ({
     
     setIsSaving(true);
     try {
+      // Pasamos una cadena vacía para instructions ya que no se necesita
       await onSave(
         name, 
-        instructions, 
+        "", // Instrucciones vacías, ya no se utilizan
         apiKeyId, 
         assistantId, 
         webhookUrl, 
@@ -256,22 +255,6 @@ const OpenAIAssistantModal: React.FC<OpenAIAssistantModalProps> = ({
                   {errors.name && (
                     <p className="text-red-500 text-xs mt-1">{errors.name}</p>
                   )}
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Descripción
-                  </label>
-                  <textarea
-                    value={instructions}
-                    onChange={(e) => setInstructions(e.target.value)}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    placeholder="Instrucciones para el asistente..."
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Describe cómo debe comportarse el asistente y qué tipo de respuestas debe dar.
-                  </p>
                 </div>
                 
                 <div>

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { X, RefreshCw, Loader2 } from "lucide-react";
 import { refreshQRCode } from "../api";
 import { toast } from "react-hot-toast";
@@ -24,12 +24,49 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
   userName,
   onQRCodeUpdated,
 }) => {
-  const [isLoading, setIsLoading] = React.useState(false);
-  const [qrcodeState, setQrcodeState] = React.useState<string | undefined>(qrCode);
+  const [isLoading, setIsLoading] = useState(false);
+  const [qrcodeState, setQrcodeState] = useState<string | undefined>(qrCode);
+  const [imgError, setImgError] = useState(false);
+  const [lastRefreshTime, setLastRefreshTime] = useState<number>(Date.now());
+  const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  React.useEffect(() => {
+  // Efecto para actualizar el QR cuando cambia el prop
+  useEffect(() => {
     setQrcodeState(qrCode);
+    setImgError(false);
+    if (qrCode) {
+      setLastRefreshTime(Date.now());
+    }
   }, [qrCode]);
+
+  // Efecto para manejar la actualización automática del QR cada 30 segundos
+  useEffect(() => {
+    if (isOpen && locationId && (userId || instanceName)) {
+      // Limpiar cualquier temporizador existente
+      if (refreshTimerRef.current) {
+        clearInterval(refreshTimerRef.current);
+      }
+      
+      // Configurar el intervalo de actualización
+      refreshTimerRef.current = setInterval(() => {
+        const currentTime = Date.now();
+        const elapsedTime = currentTime - lastRefreshTime;
+        
+        // Si han pasado más de 30 segundos desde la última actualización
+        if (elapsedTime >= 30000) {
+          fetchQRCode();
+        }
+      }, 1000); // Verificar cada segundo si necesitamos actualizar
+    }
+    
+    // Limpiar el temporizador cuando el componente se desmonta o el modal se cierra
+    return () => {
+      if (refreshTimerRef.current) {
+        clearInterval(refreshTimerRef.current);
+        refreshTimerRef.current = null;
+      }
+    };
+  }, [isOpen, locationId, userId, instanceName, lastRefreshTime]);
 
   const fetchQRCode = async () => {
     if (!locationId || (!userId && !instanceName)) {
@@ -38,10 +75,12 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
     }
     
     setIsLoading(true);
+    setImgError(false);
     try {
       const response = await refreshQRCode(locationId, userId || instanceName || "");
       if (response && response.qrcode) {
         setQrcodeState(response.qrcode);
+        setLastRefreshTime(Date.now());
         if (onQRCodeUpdated) {
           onQRCodeUpdated(response.qrcode);
         }
@@ -55,6 +94,34 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Función para renderizar el QR code correctamente
+  const renderQRCode = () => {
+    if (!qrcodeState) return null;
+    
+    // Verificar si el string ya comienza con "data:"
+    if (qrcodeState.startsWith('data:')) {
+      return qrcodeState;
+    }
+    
+    // Verificar si es un string base64 válido
+    try {
+      // Intentar decodificar para verificar si es base64 válido
+      atob(qrcodeState);
+      return `data:image/png;base64,${qrcodeState}`;
+    } catch (e) {
+      console.error("Invalid base64 string:", e);
+      return null;
+    }
+  };
+
+  // Calcular tiempo restante para la próxima actualización
+  const getTimeUntilNextRefresh = () => {
+    const currentTime = Date.now();
+    const elapsedTime = currentTime - lastRefreshTime;
+    const remainingTime = Math.max(0, 30000 - elapsedTime);
+    return Math.ceil(remainingTime / 1000);
   };
 
   if (!isOpen) return null;
@@ -84,11 +151,53 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
             </div>
           ) : qrcodeState ? (
             <>
-              <img
-                src={`data:image/png;base64,${qrcodeState}`}
-                alt="Código QR de WhatsApp"
-                className="w-64 h-64"
-              />
+              <div className="relative p-6">
+                {/* Animación de neón morado */}
+                <div className="absolute inset-0 rounded-lg overflow-hidden">
+                  <div className="absolute inset-0 bg-purple-500/20 rounded-lg"></div>
+                  <div className="absolute inset-0 animate-spin-slow">
+                    <div className="absolute top-0 left-1/2 w-1 h-1 bg-purple-600 rounded-full shadow-[0_0_10px_3px_rgba(147,51,234,0.7),0_0_20px_6px_rgba(147,51,234,0.5)]"></div>
+                    <div className="absolute bottom-0 left-1/2 w-1 h-1 bg-purple-600 rounded-full shadow-[0_0_10px_3px_rgba(147,51,234,0.7),0_0_20px_6px_rgba(147,51,234,0.5)]"></div>
+                    <div className="absolute top-1/2 left-0 w-1 h-1 bg-purple-600 rounded-full shadow-[0_0_10px_3px_rgba(147,51,234,0.7),0_0_20px_6px_rgba(147,51,234,0.5)]"></div>
+                    <div className="absolute top-1/2 right-0 w-1 h-1 bg-purple-600 rounded-full shadow-[0_0_10px_3px_rgba(147,51,234,0.7),0_0_20px_6px_rgba(147,51,234,0.5)]"></div>
+                  </div>
+                  <div className="absolute inset-0 animate-pulse-slow opacity-70">
+                    <div className="absolute inset-0 border-2 border-purple-500 rounded-lg shadow-[0_0_15px_rgba(147,51,234,0.5),inset_0_0_15px_rgba(147,51,234,0.5)]"></div>
+                  </div>
+                </div>
+                
+                {/* Contenedor del QR */}
+                <div className="w-64 h-64 flex items-center justify-center bg-white border border-gray-200 rounded-md overflow-hidden z-10 relative">
+                  {imgError ? (
+                    <div className="text-center p-4">
+                      <p className="text-red-500 font-medium">Error al cargar el QR</p>
+                      <p className="text-sm text-gray-500 mt-2">Intenta actualizar el código</p>
+                    </div>
+                  ) : (
+                    <>
+                      {qrcodeState && (
+                        <img
+                          src={renderQRCode()}
+                          alt="Código QR de WhatsApp"
+                          className="max-w-full max-h-full object-contain"
+                          onError={(e) => {
+                            console.error("Error loading QR code image");
+                            setImgError(true);
+                          }}
+                        />
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+              <div className="text-center space-y-2">
+                <p className="text-sm text-gray-600">
+                  Escanea este código con tu teléfono para conectar WhatsApp
+                </p>
+                <p className="text-xs text-gray-500">
+                  Actualización automática en {getTimeUntilNextRefresh()} segundos
+                </p>
+              </div>
               {locationId && (userId || instanceName) && (
                 <button
                   onClick={fetchQRCode}

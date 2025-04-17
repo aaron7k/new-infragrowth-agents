@@ -5,6 +5,7 @@ import {
   Trash2,
   Power,
   Settings,
+  Cog,
 } from "lucide-react";
 import type { WhatsAppInstance } from "../types";
 import api from "../api";
@@ -29,8 +30,8 @@ export const InstanceCard: React.FC<InstanceCardProps> = ({
   onEditConfig,
 }) => {
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isTurningOff, setIsTurningOff] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  
   const handleDelete = async () => {
     try {
       setIsDeleting(true);
@@ -43,20 +44,6 @@ export const InstanceCard: React.FC<InstanceCardProps> = ({
     } finally {
       setIsDeleting(false);
       setShowDeleteModal(false);
-    }
-  };
-
-  const handleTurnOff = async () => {
-    try {
-      setIsTurningOff(true);
-      await api.turnOffInstance(locationId, instance.instance_name);
-      toast.success("Instancia desconectada correctamente");
-      onInstanceUpdated?.();
-    } catch (error) {
-      console.error("Error turning off instance:", error);
-      toast.error("Error al desconectar la instancia");
-    } finally {
-      setIsTurningOff(false);
     }
   };
 
@@ -199,26 +186,13 @@ export const InstanceCard: React.FC<InstanceCardProps> = ({
             <Settings className="w-4 h-4" />
           </button>
 
-          {!isConnected && (
-            <button
-              onClick={() => onViewInstance(instance)}
-              className="flex items-center space-x-2 px-4 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 transition-colors"
-            >
-              <MessageSquare className="w-4 h-4" />
-              <span>Conectar</span>
-            </button>
-          )}
-
-          {isConnected && (
-            <button
-              onClick={handleTurnOff}
-              disabled={isTurningOff}
-              className="flex items-center space-x-2 px-4 py-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 transition-colors disabled:bg-yellow-300"
-            >
-              <Power className="w-4 h-4" />
-              <span>{isTurningOff ? "Desconectando..." : "Desconectar"}</span>
-            </button>
-          )}
+          <button
+            onClick={() => onViewInstance(instance)}
+            className="flex items-center space-x-2 px-4 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 transition-colors"
+          >
+            <Cog className="w-4 h-4" />
+            <span>Gestionar</span>
+          </button>
 
           <button
             onClick={() => setShowDeleteModal(true)}

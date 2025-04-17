@@ -41,6 +41,7 @@ const InstanceDetailPage: React.FC<InstanceDetailPageProps> = ({
     setIsLoading(true);
     try {
       const data = await api.getInstanceData(locationId, instance.instance_name);
+      console.log("Instance data:", data);
       setInstanceData(data);
     } catch (error) {
       console.error("Error fetching instance data:", error);
@@ -56,7 +57,6 @@ const InstanceDetailPage: React.FC<InstanceDetailPageProps> = ({
       setOpenAICredentials(credentials);
     } catch (error) {
       console.error("Error fetching OpenAI credentials:", error);
-      // No mostramos toast de error aquí porque es posible que no haya credenciales configuradas
       setOpenAICredentials(null);
     } finally {
       setIsLoadingCredentials(false);
@@ -90,12 +90,9 @@ const InstanceDetailPage: React.FC<InstanceDetailPageProps> = ({
         setQrCode(response.qrcode);
         setShowQRModal(true);
         onQRCodeUpdated();
-      } else {
-        // No toast here, handled in the API function
       }
     } catch (error) {
       console.error("Error refreshing QR code:", error);
-      // No toast here, handled in the API function
     } finally {
       setIsRefreshing(false);
     }
@@ -105,11 +102,9 @@ const InstanceDetailPage: React.FC<InstanceDetailPageProps> = ({
     setIsDisconnecting(true);
     try {
       await api.turnOffInstance(locationId, instance.instance_name);
-      // No toast here, handled in the API function
       fetchInstanceData();
     } catch (error) {
       console.error("Error disconnecting instance:", error);
-      // No toast here, handled in the API function
     } finally {
       setIsDisconnecting(false);
     }
@@ -119,10 +114,8 @@ const InstanceDetailPage: React.FC<InstanceDetailPageProps> = ({
     try {
       await api.createOpenAICredential(instance.instance_name, name, apiKey);
       await fetchOpenAICredentials();
-      // No toast here, handled in the API function
     } catch (error) {
       console.error("Error adding credential:", error);
-      // No toast here, handled in the API function
       throw error;
     }
   };
@@ -131,10 +124,8 @@ const InstanceDetailPage: React.FC<InstanceDetailPageProps> = ({
     try {
       await api.deleteOpenAICredential(instance.instance_name, credentialId);
       await fetchOpenAICredentials();
-      // No toast here, handled in the API function
     } catch (error) {
       console.error("Error deleting credential:", error);
-      // No toast here, handled in the API function
       throw error;
     }
   };
@@ -147,7 +138,17 @@ const InstanceDetailPage: React.FC<InstanceDetailPageProps> = ({
     webhookUrl: string,
     triggerType: string,
     triggerCondition?: string,
-    triggerValue?: string
+    triggerValue?: string,
+    expirationMinutes?: number,
+    stopKeyword?: string,
+    messageDelayMs?: number,
+    unknownMessage?: string,
+    listenToOwner?: boolean,
+    stopByOwner?: boolean,
+    keepSessionOpen?: boolean,
+    debounceSeconds?: number,
+    separateMessages?: boolean,
+    secondsPerMessage?: number
   ) => {
     try {
       await api.createOpenAIAssistant(
@@ -159,13 +160,21 @@ const InstanceDetailPage: React.FC<InstanceDetailPageProps> = ({
         webhookUrl,
         triggerType as any,
         triggerCondition as any,
-        triggerValue
+        triggerValue,
+        expirationMinutes,
+        stopKeyword,
+        messageDelayMs,
+        unknownMessage,
+        listenToOwner,
+        stopByOwner,
+        keepSessionOpen,
+        debounceSeconds,
+        separateMessages,
+        secondsPerMessage
       );
       await fetchOpenAIAssistants();
-      // No toast here, handled in the API function
     } catch (error) {
       console.error("Error adding assistant:", error);
-      // No toast here, handled in the API function
       throw error;
     }
   };
@@ -174,12 +183,13 @@ const InstanceDetailPage: React.FC<InstanceDetailPageProps> = ({
     try {
       await api.deleteOpenAIAssistant(instance.instance_name, assistantId);
       await fetchOpenAIAssistants();
-      // No toast here, handled in the API function
     } catch (error) {
       console.error("Error deleting assistant:", error);
-      // No toast here, handled in the API function
     }
   };
+
+  // Verificar si la instancia está conectada basado en el estado "open"
+  const isConnected = instanceData?.state === "open";
 
   return (
     <div className="space-y-6">
@@ -209,73 +219,71 @@ const InstanceDetailPage: React.FC<InstanceDetailPageProps> = ({
               <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
             </div>
           ) : (
-            <div className="p-4 space-y-4">
-              <div>
-                <p className="text-sm text-gray-500">Nombre de la instancia</p>
-                <p className="font-medium">{instance.instance_name}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Alias</p>
-                <p className="font-medium">{instance.instance_alias}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Estado</p>
-                <div className="flex items-center space-x-2">
-                  <span
-                    className={`inline-block w-3 h-3 rounded-full ${
-                      instanceData?.status === "CONNECTED"
-                        ? "bg-green-500"
-                        : "bg-red-500"
-                    }`}
-                  ></span>
-                  <span>
-                    {instanceData?.status === "CONNECTED"
-                      ? "Conectado"
-                      : "Desconectado"}
-                  </span>
-                </div>
-              </div>
-              {instanceData?.status === "CONNECTED" && (
-                <>
-                  <div>
-                    <p className="text-sm text-gray-500">Número</p>
-                    <p className="font-medium">{instanceData?.number || "N/A"}</p>
-                  </div>
-                  {instanceData?.photo && (
-                    <div>
-                      <p className="text-sm text-gray-500">Foto de perfil</p>
-                      <img
-                        src={instanceData.photo}
-                        alt="Perfil"
-                        className="w-16 h-16 rounded-full mt-1"
-                      />
-                    </div>
-                  )}
-                </>
-              )}
-
-              <div className="pt-4 flex space-x-3">
-                <button
-                  onClick={handleRefreshQR}
-                  disabled={isRefreshing}
-                  className="flex items-center space-x-2 px-4 py-2 bg-purple-100 text-purple-700 rounded-md hover:bg-purple-200 disabled:opacity-50"
-                >
-                  <RefreshCw
-                    className={`w-5 h-5 ${isRefreshing ? "animate-spin" : ""}`}
+            <div className="p-4 flex flex-col items-center">
+              {/* Foto de perfil centrada si está disponible */}
+              {instanceData?.photo && (
+                <div className="mb-4 flex flex-col items-center">
+                  <img
+                    src={instanceData.photo}
+                    alt="Perfil"
+                    className="w-24 h-24 rounded-full border-2 border-purple-200"
                   />
-                  <span>Actualizar QR</span>
-                </button>
-
-                {instanceData?.status === "CONNECTED" && (
-                  <button
-                    onClick={handleDisconnect}
-                    disabled={isDisconnecting}
-                    className="flex items-center space-x-2 px-4 py-2 bg-red-100 text-red-700 rounded-md hover:bg-red-200 disabled:opacity-50"
-                  >
-                    <Power className="w-5 h-5" />
-                    <span>Desconectar</span>
-                  </button>
+                  <p className="mt-2 text-sm text-gray-500">Foto de perfil</p>
+                </div>
+              )}
+              
+              {/* Información centrada */}
+              <div className="w-full max-w-md space-y-4">
+                <div className="text-center">
+                  <p className="text-sm text-gray-500">Nombre de la instancia</p>
+                  <p className="font-medium">{instance.instance_name}</p>
+                </div>
+                
+                <div className="text-center">
+                  <p className="text-sm text-gray-500">Alias</p>
+                  <p className="font-medium">{instance.instance_alias}</p>
+                </div>
+                
+                <div className="text-center">
+                  <p className="text-sm text-gray-500">Estado</p>
+                  <div className="flex items-center justify-center space-x-2">
+                    <span>
+                      {isConnected ? "🟢 Conectado" : "🔴 Desconectado"}
+                    </span>
+                  </div>
+                </div>
+                
+                {instanceData?.number && (
+                  <div className="text-center">
+                    <p className="text-sm text-gray-500">Número</p>
+                    <p className="font-medium">{instanceData.number}</p>
+                  </div>
                 )}
+                
+                {/* Botones centrados */}
+                <div className="flex justify-center pt-4">
+                  {!isConnected ? (
+                    <button
+                      onClick={handleRefreshQR}
+                      disabled={isRefreshing}
+                      className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50"
+                    >
+                      <RefreshCw
+                        className={`w-5 h-5 ${isRefreshing ? "animate-spin" : ""}`}
+                      />
+                      <span>Conectar WhatsApp</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleDisconnect}
+                      disabled={isDisconnecting}
+                      className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
+                    >
+                      <Power className="w-5 h-5" />
+                      <span>Desconectar</span>
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -306,6 +314,11 @@ const InstanceDetailPage: React.FC<InstanceDetailPageProps> = ({
         onClose={() => setShowQRModal(false)}
         qrCode={qrCode}
         instanceName={instance.instance_name}
+        locationId={locationId}
+        onQRCodeUpdated={(newQrCode) => {
+          setQrCode(newQrCode);
+          onQRCodeUpdated();
+        }}
       />
 
       {/* Modal para añadir credencial de OpenAI */}
