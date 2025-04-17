@@ -50,6 +50,9 @@ export const InstanceCard: React.FC<InstanceCardProps> = ({
   const getStatusColor = (connectionStatus: string | undefined) => {
     if (!connectionStatus) return "bg-yellow-500";
 
+    // CORREGIDO: Considerar "open" como conectado
+    if (connectionStatus.toLowerCase() === "open") return "bg-green-500";
+
     switch (connectionStatus.toLowerCase()) {
       case "connected":
       case "open":
@@ -65,6 +68,9 @@ export const InstanceCard: React.FC<InstanceCardProps> = ({
   const getStatusText = (connectionStatus: string | undefined) => {
     if (!connectionStatus) return "Pendiente";
 
+    // CORREGIDO: Considerar "open" como conectado
+    if (connectionStatus.toLowerCase() === "open") return "Conectado";
+
     switch (connectionStatus.toLowerCase()) {
       case "connected":
       case "open":
@@ -77,6 +83,7 @@ export const InstanceCard: React.FC<InstanceCardProps> = ({
     }
   };
 
+  // CORREGIDO: Verificar si está conectado incluyendo el estado "open"
   const isConnected =
     instance.connectionStatus?.toLowerCase() === "connected" ||
     instance.connectionStatus?.toLowerCase() === "open";

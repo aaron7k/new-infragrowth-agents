@@ -29,6 +29,8 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
   const [imgError, setImgError] = useState(false);
   const [lastRefreshTime, setLastRefreshTime] = useState<number>(Date.now());
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const connectionCheckTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [connectionState, setConnectionState] = useState<string | null>(null);
 
   // Efecto para actualizar el QR cuando cambia el prop
   useEffect(() => {
@@ -57,16 +59,74 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
           fetchQRCode();
         }
       }, 1000); // Verificar cada segundo si necesitamos actualizar
+
+      // Configurar verificación de estado de conexión cada 5 segundos
+      if (connectionCheckTimerRef.current) {
+        clearInterval(connectionCheckTimerRef.current);
+      }
+
+      connectionCheckTimerRef.current = setInterval(() => {
+        checkConnectionStatus();
+      }, 5000);
     }
     
-    // Limpiar el temporizador cuando el componente se desmonta o el modal se cierra
+    // Limpiar los temporizadores cuando el componente se desmonta o el modal se cierra
     return () => {
       if (refreshTimerRef.current) {
         clearInterval(refreshTimerRef.current);
         refreshTimerRef.current = null;
       }
+      if (connectionCheckTimerRef.current) {
+        clearInterval(connectionCheckTimerRef.current);
+        connectionCheckTimerRef.current = null;
+      }
     };
   }, [isOpen, locationId, userId, instanceName, lastRefreshTime]);
+
+  // Verificar el estado de conexión
+  const checkConnectionStatus = async () => {
+    if (!locationId || (!userId && !instanceName)) {
+      return;
+    }
+
+    try {
+      const response = await refreshQRCode(locationId, userId || instanceName || "");
+      console.log("Verificando estado de conexión:", response);
+      
+      // Si el estado es "open", significa que ya está conectado
+      if (response.state === "open") {
+        console.log("¡Conexión exitosa! Cerrando modal...");
+        setConnectionState("open");
+        
+        // Cerrar el modal y notificar
+        toast.success("¡WhatsApp conectado correctamente!");
+        
+        // Limpiar temporizadores
+        if (refreshTimerRef.current) {
+          clearInterval(refreshTimerRef.current);
+          refreshTimerRef.current = null;
+        }
+        if (connectionCheckTimerRef.current) {
+          clearInterval(connectionCheckTimerRef.current);
+          connectionCheckTimerRef.current = null;
+        }
+        
+        // Cerrar el modal después de un breve retraso
+        setTimeout(() => {
+          onClose();
+        }, 1500);
+      } else {
+        setConnectionState(response.state || null);
+      }
+      
+      // Si no hay código QR pero tampoco está conectado, podría ser un error
+      if (!response.qrcode && response.state !== "open") {
+        console.log("No se recibió QR pero no está conectado. Estado:", response.state);
+      }
+    } catch (error) {
+      console.error("Error verificando estado de conexión:", error);
+    }
+  };
 
   const fetchQRCode = async () => {
     if (!locationId || (!userId && !instanceName)) {
@@ -78,15 +138,49 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
     setImgError(false);
     try {
       const response = await refreshQRCode(locationId, userId || instanceName || "");
+      console.log("Respuesta de refreshQRCode:", response);
+      
+      // Si el estado es "open", significa que ya está conectado
+      if (response.state === "open") {
+        console.log("¡Conexión exitosa! Cerrando modal...");
+        setConnectionState("open");
+        
+        // Cerrar el modal y notificar
+        toast.success("¡WhatsApp conectado correctamente!");
+        
+        // Limpiar temporizadores
+        if (refreshTimerRef.current) {
+          clearInterval(refreshTimerRef.current);
+          refreshTimerRef.current = null;
+        }
+        if (connectionCheckTimerRef.current) {
+          clearInterval(connectionCheckTimerRef.current);
+          connectionCheckTimerRef.current = null;
+        }
+        
+        // Cerrar el modal después de un breve retraso
+        setTimeout(() => {
+          onClose();
+        }, 1500);
+        
+        return;
+      }
+      
       if (response && response.qrcode) {
         setQrcodeState(response.qrcode);
         setLastRefreshTime(Date.now());
         if (onQRCodeUpdated) {
           onQRCodeUpdated(response.qrcode);
         }
+      } else if (response.error) {
+        console.error("Error en respuesta:", response.error);
+        toast.error(response.error);
       } else {
         console.error("No QR code received in response:", response);
-        toast.error("No se pudo obtener el código QR.");
+        // No mostrar error si el estado es "open" (ya conectado)
+        if (response.state !== "open") {
+          toast.error("No se pudo obtener el código QR.");
+        }
       }
     } catch (error) {
       console.error("Error fetching QR code:", error);
@@ -124,6 +218,7 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
     return Math.ceil(remainingTime / 1000);
   };
 
+  // Si el modal no está abierto o si ya está conectado, no mostrar nada
   if (!isOpen) return null;
 
   return (
@@ -147,6 +242,20 @@ const QRCodeModal: React.FC<QRCodeModalProps> = ({
               <Loader2 className="w-12 h-12 text-blue-500 animate-spin mb-4" />
               <p className="text-gray-600 text-center">
                 Obteniendo código QR...
+              </p>
+            </div>
+          ) : connectionState === "open" ? (
+            <div className="flex flex-col items-center justify-center p-8">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <p className="text-lg font-medium text-green-600 text-center">
+                ¡Conectado correctamente!
+              </p>
+              <p className="text-sm text-gray-500 text-center mt-2">
+                Cerrando ventana...
               </p>
             </div>
           ) : qrcodeState ? (

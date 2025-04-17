@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { PlusCircle, Bot, Loader2, Trash2, Copy, Edit, Check } from "lucide-react";
+import { PlusCircle, Bot, Loader2, Trash2, Copy, Edit, Check, Link, MessageSquare } from "lucide-react";
+import { toast } from "react-hot-toast";
 import { OpenAIAssistant } from "../types";
 import { DeleteAssistantConfirmationModal } from "./DeleteAssistantConfirmationModal";
 import OpenAIAssistantModal from "./OpenAIAssistantModal";
@@ -9,7 +10,7 @@ interface OpenAIAssistantsListProps {
   assistants: OpenAIAssistant[];
   onAddAssistant: () => void;
   onDeleteAssistant: (id: string) => void;
-  onEditAssistant: (
+  onEditAssistant?: (
     id: string,
     name: string, 
     instructions: string, 
@@ -78,8 +79,16 @@ const OpenAIAssistantsList: React.FC<OpenAIAssistantsListProps> = ({
   const handleEditClick = async (assistant: OpenAIAssistant) => {
     setIsLoadingAssistant(true);
     try {
+      // Verificar que instanceName no sea undefined
+      if (!instanceName) {
+        console.error("instanceName es undefined en OpenAIAssistantsList");
+        toast.error("Error: No se pudo identificar la instancia");
+        return;
+      }
+      
+      console.log("Obteniendo asistente con instanceName:", instanceName, "y assistantId:", assistant.id);
+      
       // Obtener los datos completos del asistente
-      // IMPORTANTE: Pasamos tanto el nombre de la instancia como el ID del asistente
       const assistantData = await getOpenAIAssistant(instanceName, assistant.id);
       console.log("Datos del asistente recibidos:", assistantData);
       setAssistantToEdit(assistantData);
@@ -111,7 +120,7 @@ const OpenAIAssistantsList: React.FC<OpenAIAssistantsListProps> = ({
     separateMessages?: boolean,
     secondsPerMessage?: number
   ) => {
-    if (!assistantToEdit) return;
+    if (!assistantToEdit || !onEditAssistant) return;
     
     await onEditAssistant(
       assistantToEdit.id,
@@ -146,6 +155,28 @@ const OpenAIAssistantsList: React.FC<OpenAIAssistantsListProps> = ({
       setTimeout(() => {
         setCopiedId(null);
       }, 2000);
+    }
+  };
+
+  // Función para obtener el texto del disparador según el tipo
+  const getTriggerText = (assistant: OpenAIAssistant) => {
+    switch (assistant.triggerType) {
+      case 'all':
+        return 'Todos los mensajes';
+      case 'none':
+        return 'Manual';
+      case 'keyword':
+        return assistant.triggerValue || 'Palabra clave';
+      case 'advanced':
+        const condition = assistant.triggerCondition ? 
+          `${assistant.triggerCondition === 'contains' ? 'contiene' : 
+            assistant.triggerCondition === 'equals' ? 'igual a' :
+            assistant.triggerCondition === 'startsWith' ? 'empieza con' :
+            assistant.triggerCondition === 'endsWith' ? 'termina con' :
+            'regex'} ` : '';
+        return `${condition}${assistant.triggerValue || ''}`;
+      default:
+        return 'No definido';
     }
   };
 
@@ -221,24 +252,41 @@ const OpenAIAssistantsList: React.FC<OpenAIAssistantsListProps> = ({
                     </button>
                   </div>
                   
-                  <p className="text-sm text-gray-500 line-clamp-2 mt-1">
-                    {assistant.instructions || "Sin instrucciones"}
-                  </p>
+                  {/* Mostrar webhook de funciones */}
+                  <div className="flex items-center mt-2 text-sm text-gray-600">
+                    <Link className="w-4 h-4 mr-1 text-gray-400" />
+                    <span>
+                      {assistant.webhookUrl ? 
+                        <span className="truncate inline-block max-w-xs">{assistant.webhookUrl}</span> : 
+                        <span className="text-gray-400">Sin webhook</span>
+                      }
+                    </span>
+                  </div>
+                  
+                  {/* Mostrar tipo de disparador */}
+                  <div className="flex items-center mt-1 text-sm text-gray-600">
+                    <MessageSquare className="w-4 h-4 mr-1 text-gray-400" />
+                    <span>
+                      Disparador: <span className="font-medium">{getTriggerText(assistant)}</span>
+                    </span>
+                  </div>
                 </div>
                 
                 <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => handleEditClick(assistant)}
-                    className="text-blue-500 hover:text-blue-700"
-                    title="Editar asistente"
-                    disabled={isLoadingAssistant}
-                  >
-                    {isLoadingAssistant ? (
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                    ) : (
-                      <Edit className="w-5 h-5" />
-                    )}
-                  </button>
+                  {onEditAssistant && (
+                    <button
+                      onClick={() => handleEditClick(assistant)}
+                      className="text-blue-500 hover:text-blue-700"
+                      title="Editar asistente"
+                      disabled={isLoadingAssistant}
+                    >
+                      {isLoadingAssistant ? (
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      ) : (
+                        <Edit className="w-5 h-5" />
+                      )}
+                    </button>
+                  )}
                   <button
                     onClick={() => handleDeleteClick(assistant)}
                     className="text-red-500 hover:text-red-700"
@@ -261,7 +309,7 @@ const OpenAIAssistantsList: React.FC<OpenAIAssistantsListProps> = ({
         isDeleting={isDeleting}
       />
 
-      {assistantToEdit && (
+      {assistantToEdit && onEditAssistant && (
         <OpenAIAssistantModal
           isOpen={editModalOpen}
           onClose={() => {

@@ -106,6 +106,8 @@ export const refreshQRCode = async (
       instanceName,
     });
     
+    console.log("QR Code response:", response.data);
+    
     if (response.data && response.data.message) {
       toast.success(response.data.message);
     }
@@ -165,6 +167,25 @@ export const getInstanceData = async (
       locationId,
       instanceName,
     });
+    
+    // Verificar si hay un estado en la respuesta
+    if (!response.data.state) {
+      // Si no hay estado, intentar obtenerlo del endpoint get-qr
+      try {
+        const qrResponse = await axios.post(`${BASE_URL}/get-qr`, {
+          locationId,
+          instanceName,
+        });
+        
+        // Si get-qr devuelve un estado, usarlo
+        if (qrResponse.data && qrResponse.data.state) {
+          response.data.state = qrResponse.data.state;
+        }
+      } catch (qrError) {
+        console.error("Error getting QR state:", qrError);
+      }
+    }
+    
     return response.data;
   } catch (error) {
     if (error instanceof Error) {
