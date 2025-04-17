@@ -8,10 +8,6 @@ import {
   OpenAIAssistant,
   TriggerType,
   TriggerCondition,
-  // InstanceData,
-  // APIResponse,
-  // ListInstancesResponse,
-  // SingleInstanceResponse,
 } from "./types";
 import { toast } from "react-hot-toast";
 
@@ -404,6 +400,75 @@ export const getOpenAIAssistants = async (instanceName: string): Promise<OpenAIA
   }
 };
 
+// Función para obtener un asistente específico
+export const getOpenAIAssistant = async (instanceName: string, assistantId: string): Promise<OpenAIAssistant> => {
+  try {
+    console.log(`Enviando petición GET a ${OPENAI_BASE_URL}/agent con params:`, { 
+      instance_name: instanceName, 
+      id: assistantId 
+    });
+    
+    const response = await axios.get(`${OPENAI_BASE_URL}/agent`, {
+      params: { 
+        instance_name: instanceName,
+        id: assistantId
+      }
+    });
+    
+    console.log("Respuesta completa de getOpenAIAssistant:", response);
+    
+    if (!response.data) {
+      throw new Error("La respuesta no contiene datos");
+    }
+    
+    // Mapear directamente los campos de la respuesta a nuestra estructura
+    const assistant = response.data;
+    return {
+      id: assistant.id || "",
+      name: assistant.description || "Sin nombre",
+      instructions: "",
+      apiKeyId: assistant.openaiCredsId || "",
+      createdAt: assistant.createdAt || new Date().toISOString(),
+      updatedAt: assistant.updatedAt || new Date().toISOString(),
+      assistantId: assistant.assistantId || "",
+      webhookUrl: assistant.functionUrl || "",
+      triggerType: (assistant.triggerType || "all") as TriggerType,
+      triggerCondition: (assistant.triggerOperator || "contains") as TriggerCondition,
+      triggerValue: assistant.triggerValue || "",
+      expirationMinutes: assistant.expire || 60,
+      stopKeyword: assistant.keywordFinish || "#stop",
+      messageDelayMs: assistant.delayMessage || 1500,
+      unknownMessage: assistant.unknownMessage || "No puedo entender aún este tipo de mensajes",
+      listenToOwner: assistant.listeningFromMe || false,
+      stopByOwner: assistant.stopBotFromMe !== undefined ? assistant.stopBotFromMe : true,
+      keepSessionOpen: assistant.keepOpen !== undefined ? assistant.keepOpen : true,
+      debounceSeconds: assistant.debounceTime || 6,
+      separateMessages: assistant.splitMessages !== undefined ? assistant.splitMessages : true,
+      secondsPerMessage: (assistant.timePerChar || 10) / 10
+    };
+  } catch (error) {
+    console.error("Error completo al obtener asistente:", error);
+    
+    if (error instanceof Error) {
+      console.error("Error fetching OpenAI assistant:", error.message);
+    }
+    
+    if (axios.isAxiosError(error)) {
+      console.error("Axios error details:", error.response?.data);
+      console.error("Status:", error.response?.status);
+      console.error("Headers:", error.response?.headers);
+      
+      if (error.response?.data?.message) {
+        toast.error(error.response.data.message);
+      }
+    } else {
+      toast.error("Error al obtener el asistente de OpenAI");
+    }
+    
+    throw error;
+  }
+};
+
 export const createOpenAIAssistant = async (
   instanceName: string,
   name: string,
@@ -476,6 +541,81 @@ export const createOpenAIAssistant = async (
   }
 };
 
+// Añadir función para actualizar un asistente existente
+export const updateOpenAIAssistant = async (
+  instanceName: string,
+  id: string,
+  name: string,
+  instructions: string,
+  apiKeyId: string,
+  assistantId: string,
+  webhookUrl: string,
+  triggerType: TriggerType,
+  triggerCondition?: TriggerCondition,
+  triggerValue?: string,
+  expirationMinutes?: number,
+  stopKeyword?: string,
+  messageDelayMs?: number,
+  unknownMessage?: string,
+  listenToOwner?: boolean,
+  stopByOwner?: boolean,
+  keepSessionOpen?: boolean,
+  debounceSeconds?: number,
+  separateMessages?: boolean,
+  secondsPerMessage?: number
+) => {
+  try {
+    const payload: any = {
+      instance_name: instanceName,
+      id: id,
+      description: name,
+      openaiCredsId: apiKeyId,
+      assistantId: assistantId,
+      functionUrl: webhookUrl,
+      triggerType: triggerType,
+      botType: "assistant"
+    };
+
+    // Solo incluir condición y valor si el tipo de disparador lo requiere
+    if (triggerType === 'keyword' || triggerType === 'advanced') {
+      payload.triggerOperator = triggerCondition;
+      payload.triggerValue = triggerValue;
+    }
+
+    // Incluir todas las configuraciones avanzadas
+    if (expirationMinutes !== undefined) payload.expire = expirationMinutes;
+    if (stopKeyword !== undefined) payload.keywordFinish = stopKeyword;
+    if (messageDelayMs !== undefined) payload.delayMessage = messageDelayMs;
+    if (unknownMessage !== undefined) payload.unknownMessage = unknownMessage;
+    if (listenToOwner !== undefined) payload.listeningFromMe = listenToOwner;
+    if (stopByOwner !== undefined) payload.stopBotFromMe = stopByOwner;
+    if (keepSessionOpen !== undefined) payload.keepOpen = keepSessionOpen;
+    if (debounceSeconds !== undefined) payload.debounceTime = debounceSeconds;
+    if (separateMessages !== undefined) payload.splitMessages = separateMessages;
+    if (secondsPerMessage !== undefined) payload.timePerChar = secondsPerMessage * 10;
+
+    const response = await axios.put(`${OPENAI_BASE_URL}/assistants`, payload);
+    
+    if (response.data && response.data.message) {
+      toast.success(response.data.message);
+    }
+    
+    return response.data;
+  } catch (error) {
+    if (error instanceof Error) {
+      console.error("Error updating OpenAI assistant:", error.message);
+    }
+    
+    if (axios.isAxiosError(error) && error.response?.data?.message) {
+      toast.error(error.response.data.message);
+    } else {
+      toast.error("Error al actualizar el asistente de OpenAI");
+    }
+    
+    throw error;
+  }
+};
+
 export const deleteOpenAIAssistant = async (
   instanceName: string,
   assistantId: string
@@ -523,7 +663,9 @@ const api = {
   createOpenAICredential,
   deleteOpenAICredential,
   getOpenAIAssistants,
+  getOpenAIAssistant,
   createOpenAIAssistant,
+  updateOpenAIAssistant,
   deleteOpenAIAssistant
 };
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { X, Loader2, HelpCircle, Info, ExternalLink } from "lucide-react";
+import { OpenAIAssistant } from "../types";
 
 interface ApiKeyOption {
   id: string;
@@ -32,6 +33,8 @@ interface OpenAIAssistantModalProps {
   instanceName: string;
   apiKeys: ApiKeyOption[];
   isLoading?: boolean;
+  initialData?: OpenAIAssistant;
+  isEditing?: boolean;
 }
 
 const OpenAIAssistantModal: React.FC<OpenAIAssistantModalProps> = ({
@@ -39,8 +42,10 @@ const OpenAIAssistantModal: React.FC<OpenAIAssistantModalProps> = ({
   onClose,
   onSave,
   instanceName,
-  apiKeys,
+  apiKeys = [], // Proporcionar un valor predeterminado para evitar undefined
   isLoading = false,
+  initialData,
+  isEditing = false,
 }) => {
   // Campos básicos
   const [name, setName] = useState("");
@@ -67,34 +72,57 @@ const OpenAIAssistantModal: React.FC<OpenAIAssistantModalProps> = ({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState<'basic' | 'advanced'>('basic');
 
-  // Resetear los campos cuando se abre el modal
+  // Cargar datos iniciales si estamos editando
   useEffect(() => {
     if (isOpen) {
-      // Campos básicos
-      setName("");
-      setApiKeyId("");
-      setAssistantId("");
-      setWebhookUrl("");
-      setTriggerType("all");
-      setTriggerCondition("contains");
-      setTriggerValue("");
-      
-      // Campos adicionales con valores predeterminados actualizados
-      setExpirationMinutes(60);
-      setStopKeyword("#stop");
-      setMessageDelayMs(1500);
-      setUnknownMessage("No puedo entender aún este tipo de mensajes");
-      setListenToOwner(false);
-      setStopByOwner(true);
-      setKeepSessionOpen(true);
-      setDebounceSeconds(6);
-      setSeparateMessages(true);
-      setSecondsPerMessage(1);
+      if (initialData && isEditing) {
+        // Campos básicos
+        setName(initialData.name || "");
+        setApiKeyId(initialData.apiKeyId || "");
+        setAssistantId(initialData.assistantId || "");
+        setWebhookUrl(initialData.webhookUrl || "");
+        setTriggerType(initialData.triggerType || "all");
+        setTriggerCondition(initialData.triggerCondition || "contains");
+        setTriggerValue(initialData.triggerValue || "");
+        
+        // Campos adicionales
+        setExpirationMinutes(initialData.expirationMinutes || 60);
+        setStopKeyword(initialData.stopKeyword || "#stop");
+        setMessageDelayMs(initialData.messageDelayMs || 1500);
+        setUnknownMessage(initialData.unknownMessage || "No puedo entender aún este tipo de mensajes");
+        setListenToOwner(initialData.listenToOwner || false);
+        setStopByOwner(initialData.stopByOwner !== undefined ? initialData.stopByOwner : true);
+        setKeepSessionOpen(initialData.keepSessionOpen !== undefined ? initialData.keepSessionOpen : true);
+        setDebounceSeconds(initialData.debounceSeconds || 6);
+        setSeparateMessages(initialData.separateMessages !== undefined ? initialData.separateMessages : true);
+        setSecondsPerMessage(initialData.secondsPerMessage || 1);
+      } else {
+        // Resetear los campos cuando se abre el modal para crear
+        setName("");
+        setApiKeyId("");
+        setAssistantId("");
+        setWebhookUrl("");
+        setTriggerType("all");
+        setTriggerCondition("contains");
+        setTriggerValue("");
+        
+        // Campos adicionales con valores predeterminados
+        setExpirationMinutes(60);
+        setStopKeyword("#stop");
+        setMessageDelayMs(1500);
+        setUnknownMessage("No puedo entender aún este tipo de mensajes");
+        setListenToOwner(false);
+        setStopByOwner(true);
+        setKeepSessionOpen(true);
+        setDebounceSeconds(6);
+        setSeparateMessages(true);
+        setSecondsPerMessage(1);
+      }
       
       setErrors({});
       setActiveTab('basic');
     }
-  }, [isOpen]);
+  }, [isOpen, initialData, isEditing]);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -182,7 +210,7 @@ const OpenAIAssistantModal: React.FC<OpenAIAssistantModalProps> = ({
       <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-xl font-semibold text-purple-900">
-            Crear Asistente de OpenAI
+            {isEditing ? "Editar Asistente de OpenAI" : "Crear Asistente de OpenAI"}
           </h3>
           <button
             onClick={onClose}
@@ -600,7 +628,7 @@ const OpenAIAssistantModal: React.FC<OpenAIAssistantModalProps> = ({
               <button
                 type="submit"
                 className="px-4 py-2 text-white bg-purple-600 rounded-md hover:bg-purple-700 disabled:bg-purple-300"
-                disabled={isSaving || apiKeys.length === 0}
+                disabled={isSaving || (apiKeys && apiKeys.length === 0)}
               >
                 {isSaving ? "Guardando..." : "Guardar"}
               </button>
