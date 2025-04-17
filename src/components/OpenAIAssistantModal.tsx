@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { X, Loader2, HelpCircle, Info } from "lucide-react";
+import { X, Loader2, HelpCircle, Info, ExternalLink } from "lucide-react";
 
 interface ApiKeyOption {
   id: string;
@@ -52,16 +52,16 @@ const OpenAIAssistantModal: React.FC<OpenAIAssistantModalProps> = ({
   const [triggerCondition, setTriggerCondition] = useState<string>("contains");
   const [triggerValue, setTriggerValue] = useState("");
   
-  // Campos adicionales
+  // Campos adicionales con valores predeterminados actualizados
   const [expirationMinutes, setExpirationMinutes] = useState<number>(60);
   const [stopKeyword, setStopKeyword] = useState<string>("#stop");
-  const [messageDelayMs, setMessageDelayMs] = useState<number>(1000);
+  const [messageDelayMs, setMessageDelayMs] = useState<number>(1500);
   const [unknownMessage, setUnknownMessage] = useState<string>("No puedo entender aún este tipo de mensajes");
-  const [listenToOwner, setListenToOwner] = useState<boolean>(true);
+  const [listenToOwner, setListenToOwner] = useState<boolean>(false);
   const [stopByOwner, setStopByOwner] = useState<boolean>(true);
-  const [keepSessionOpen, setKeepSessionOpen] = useState<boolean>(false);
-  const [debounceSeconds, setDebounceSeconds] = useState<number>(2);
-  const [separateMessages, setSeparateMessages] = useState<boolean>(false);
+  const [keepSessionOpen, setKeepSessionOpen] = useState<boolean>(true);
+  const [debounceSeconds, setDebounceSeconds] = useState<number>(6);
+  const [separateMessages, setSeparateMessages] = useState<boolean>(true);
   const [secondsPerMessage, setSecondsPerMessage] = useState<number>(1);
   
   const [isSaving, setIsSaving] = useState(false);
@@ -81,16 +81,16 @@ const OpenAIAssistantModal: React.FC<OpenAIAssistantModalProps> = ({
       setTriggerCondition("contains");
       setTriggerValue("");
       
-      // Campos adicionales
+      // Campos adicionales con valores predeterminados actualizados
       setExpirationMinutes(60);
       setStopKeyword("#stop");
-      setMessageDelayMs(1000);
+      setMessageDelayMs(1500);
       setUnknownMessage("No puedo entender aún este tipo de mensajes");
-      setListenToOwner(true);
+      setListenToOwner(false);
       setStopByOwner(true);
-      setKeepSessionOpen(false);
-      setDebounceSeconds(2);
-      setSeparateMessages(false);
+      setKeepSessionOpen(true);
+      setDebounceSeconds(6);
+      setSeparateMessages(true);
       setSecondsPerMessage(1);
       
       setErrors({});
@@ -304,8 +304,17 @@ const OpenAIAssistantModal: React.FC<OpenAIAssistantModalProps> = ({
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
                     ID del Asistente
+                    <a 
+                      href="https://platform.openai.com/playground/assistants" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="ml-2 text-purple-600 hover:text-purple-800 flex items-center"
+                      title="Crear asistente en OpenAI"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
                   </label>
                   <input
                     type="text"
@@ -321,7 +330,7 @@ const OpenAIAssistantModal: React.FC<OpenAIAssistantModalProps> = ({
                   )}
                   <p className="text-xs text-gray-500 mt-1 flex items-center">
                     <HelpCircle className="w-3 h-3 mr-1" />
-                    ID del asistente creado en OpenAI (comienza con "asst_")
+                    ID del asistente creado en la plataforma de OpenAI (comienza con "asst_")
                   </p>
                 </div>
                 
@@ -337,7 +346,7 @@ const OpenAIAssistantModal: React.FC<OpenAIAssistantModalProps> = ({
                     placeholder="https://..."
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    URL para llamadas a funciones (opcional)
+                    URL para llamadas a funciones externas desde el asistente (opcional)
                   </p>
                 </div>
                 
@@ -356,7 +365,7 @@ const OpenAIAssistantModal: React.FC<OpenAIAssistantModalProps> = ({
                     <option value="advanced">Avanzado</option>
                   </select>
                   <p className="text-xs text-gray-500 mt-1">
-                    Define cuándo se activará el asistente
+                    Define cuándo se activará el asistente en la conversación
                   </p>
                 </div>
                 
@@ -426,7 +435,7 @@ const OpenAIAssistantModal: React.FC<OpenAIAssistantModalProps> = ({
                       <p className="text-red-500 text-xs mt-1">{errors.expirationMinutes}</p>
                     )}
                     <p className="text-xs text-gray-500 mt-1">
-                      Tiempo de inactividad antes de finalizar la conversación
+                      Tiempo de inactividad antes de finalizar la conversación automáticamente
                     </p>
                   </div>
                   
@@ -442,7 +451,7 @@ const OpenAIAssistantModal: React.FC<OpenAIAssistantModalProps> = ({
                       placeholder="#stop"
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      Palabra que detiene la conversación con el asistente
+                      Palabra que el usuario puede enviar para detener la conversación con el asistente
                     </p>
                   </div>
                   
@@ -463,7 +472,7 @@ const OpenAIAssistantModal: React.FC<OpenAIAssistantModalProps> = ({
                       <p className="text-red-500 text-xs mt-1">{errors.messageDelayMs}</p>
                     )}
                     <p className="text-xs text-gray-500 mt-1">
-                      Tiempo de espera para simular "escribiendo..."
+                      Tiempo de espera para simular que el asistente está "escribiendo..."
                     </p>
                   </div>
                   
@@ -484,7 +493,7 @@ const OpenAIAssistantModal: React.FC<OpenAIAssistantModalProps> = ({
                       <p className="text-red-500 text-xs mt-1">{errors.debounceSeconds}</p>
                     )}
                     <p className="text-xs text-gray-500 mt-1">
-                      Tiempo para agrupar mensajes consecutivos del usuario
+                      Tiempo para agrupar mensajes consecutivos del usuario antes de procesarlos
                     </p>
                   </div>
                 </div>
@@ -501,7 +510,7 @@ const OpenAIAssistantModal: React.FC<OpenAIAssistantModalProps> = ({
                     placeholder="No puedo entender aún este tipo de mensajes"
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Mensaje que se muestra cuando la IA no entiende el input
+                    Mensaje que se muestra cuando el asistente no puede procesar ciertos tipos de mensajes
                   </p>
                 </div>
                 
@@ -517,7 +526,7 @@ const OpenAIAssistantModal: React.FC<OpenAIAssistantModalProps> = ({
                     <label htmlFor="listenToOwner" className="ml-2 block text-sm text-gray-700">
                       Escuchando al dueño
                     </label>
-                    <div className="ml-2 text-gray-500 cursor-help" title="Activar cuando el humano escribe">
+                    <div className="ml-2 text-gray-500 cursor-help" title="Permite que el asistente responda a mensajes del propietario del número de WhatsApp">
                       <Info className="h-4 w-4" />
                     </div>
                   </div>
@@ -533,7 +542,7 @@ const OpenAIAssistantModal: React.FC<OpenAIAssistantModalProps> = ({
                     <label htmlFor="stopByOwner" className="ml-2 block text-sm text-gray-700">
                       Detener por el dueño
                     </label>
-                    <div className="ml-2 text-gray-500 cursor-help" title="Detener cuando el humano escribe la palabra clave">
+                    <div className="ml-2 text-gray-500 cursor-help" title="Permite que el propietario del número detenga el asistente usando la palabra clave">
                       <Info className="h-4 w-4" />
                     </div>
                   </div>
@@ -549,7 +558,7 @@ const OpenAIAssistantModal: React.FC<OpenAIAssistantModalProps> = ({
                     <label htmlFor="keepSessionOpen" className="ml-2 block text-sm text-gray-700">
                       Mantener sesión abierta
                     </label>
-                    <div className="ml-2 text-gray-500 cursor-help" title="Mantener la conversación activa incluso después de inactividad">
+                    <div className="ml-2 text-gray-500 cursor-help" title="Mantiene el contexto de la conversación activo incluso después de periodos de inactividad">
                       <Info className="h-4 w-4" />
                     </div>
                   </div>
@@ -565,7 +574,7 @@ const OpenAIAssistantModal: React.FC<OpenAIAssistantModalProps> = ({
                     <label htmlFor="separateMessages" className="ml-2 block text-sm text-gray-700">
                       Separar mensajes de IA
                     </label>
-                    <div className="ml-2 text-gray-500 cursor-help" title="Dividir respuestas largas en múltiples mensajes">
+                    <div className="ml-2 text-gray-500 cursor-help" title="Divide las respuestas largas del asistente en múltiples mensajes para mejor legibilidad">
                       <Info className="h-4 w-4" />
                     </div>
                   </div>
@@ -589,7 +598,7 @@ const OpenAIAssistantModal: React.FC<OpenAIAssistantModalProps> = ({
                       <p className="text-red-500 text-xs mt-1">{errors.secondsPerMessage}</p>
                     )}
                     <p className="text-xs text-gray-500 mt-1">
-                      Tiempo entre mensajes separados
+                      Intervalo de tiempo entre el envío de mensajes separados
                     </p>
                   </div>
                 )}
