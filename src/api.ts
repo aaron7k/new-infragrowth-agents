@@ -8,6 +8,8 @@ import {
   OpenAIAssistant,
   TriggerType,
   TriggerCondition,
+  AssistantSession,
+  SessionAction
 } from "./types";
 import { toast } from "react-hot-toast";
 
@@ -669,6 +671,126 @@ export const deleteOpenAIAssistant = async (
   }
 };
 
+// Nueva función para obtener las sesiones de un asistente
+export const getAssistantSessions = async (
+  instanceName: string,
+  assistantId: string
+): Promise<AssistantSession[]> => {
+  try {
+    const response = await axios.get(`${OPENAI_BASE_URL}/sessions`, {
+      params: { 
+        instance_name: instanceName,
+        id: assistantId
+      }
+    });
+    
+    if (response.data && Array.isArray(response.data.data)) {
+      return response.data.data;
+    }
+    
+    return [];
+  } catch (error) {
+    if (error instanceof Error) {
+      console.error("Error fetching assistant sessions:", error.message);
+    }
+    
+    if (axios.isAxiosError(error) && error.response?.data?.message) {
+      toast.error(error.response.data.message);
+    } else {
+      toast.error("Error al obtener las sesiones del asistente");
+    }
+    
+    return [];
+  }
+};
+
+// Nueva función unificada para cambiar el estado de una sesión
+export const updateSessionState = async (
+  instanceName: string,
+  assistantId: string,
+  sessionId: string,
+  remoteJid: string,
+  action: SessionAction
+) => {
+  try {
+    const response = await axios.post(`${OPENAI_BASE_URL}/sessions`, {
+      instance_name: instanceName,
+      id: assistantId,
+      sessionId: sessionId,
+      remoteJid: remoteJid,
+      action: action
+    });
+    
+    const actionMessages = {
+      opened: "Sesión abierta correctamente",
+      paused: "Sesión pausada correctamente",
+      closed: "Sesión cerrada correctamente",
+      delete: "Sesión eliminada correctamente"
+    };
+    
+    if (response.data) {
+      toast.success(response.data.message || actionMessages[action]);
+    }
+    
+    return response.data;
+  } catch (error) {
+    if (error instanceof Error) {
+      console.error(`Error updating session state (${action}):`, error.message);
+    }
+    
+    if (axios.isAxiosError(error) && error.response?.data?.message) {
+      toast.error(error.response.data.message);
+    } else {
+      const errorMessages = {
+        opened: "Error al abrir la sesión",
+        paused: "Error al pausar la sesión",
+        closed: "Error al cerrar la sesión",
+        delete: "Error al eliminar la sesión"
+      };
+      toast.error(errorMessages[action]);
+    }
+    
+    throw error;
+  }
+};
+
+// Funciones específicas para cada acción (utilizan la función unificada)
+export const pauseAssistantSession = async (
+  instanceName: string,
+  assistantId: string,
+  sessionId: string,
+  remoteJid: string
+) => {
+  return updateSessionState(instanceName, assistantId, sessionId, remoteJid, "paused");
+};
+
+export const openAssistantSession = async (
+  instanceName: string,
+  assistantId: string,
+  sessionId: string,
+  remoteJid: string
+) => {
+  return updateSessionState(instanceName, assistantId, sessionId, remoteJid, "opened");
+};
+
+export const closeAssistantSession = async (
+  instanceName: string,
+  assistantId: string,
+  sessionId: string,
+  remoteJid: string
+) => {
+  return updateSessionState(instanceName, assistantId, sessionId, remoteJid, "closed");
+};
+
+export const deleteAssistantSession = async (
+  instanceName: string,
+  assistantId: string,
+  sessionId: string,
+  remoteJid: string
+) => {
+  return updateSessionState(instanceName, assistantId, sessionId, remoteJid, "delete");
+};
+
 // Asegurarse de que todas las funciones estén disponibles para importación
 const api = {
   getUsers,
@@ -687,7 +809,13 @@ const api = {
   getOpenAIAssistant,
   createOpenAIAssistant,
   updateOpenAIAssistant,
-  deleteOpenAIAssistant
+  deleteOpenAIAssistant,
+  getAssistantSessions,
+  updateSessionState,
+  pauseAssistantSession,
+  openAssistantSession,
+  closeAssistantSession,
+  deleteAssistantSession
 };
 
 export default api;

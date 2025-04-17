@@ -87,8 +87,25 @@ export interface OpenAIAssistant {
   secondsPerMessage?: number;
 }
 
+export interface AssistantSession {
+  id: string;
+  sessionId: string;
+  remoteJid: string;
+  pushName: string | null;
+  status: "opened" | "closed" | "paused";
+  awaitUser: boolean;
+  context: any;
+  type: string;
+  createdAt: string;
+  updatedAt: string;
+  instanceId: string;
+  parameters: any;
+  botId: string;
+}
+
 export type TriggerType = 'keyword' | 'all' | 'none' | 'advanced';
 export type TriggerCondition = 'contains' | 'equals' | 'startsWith' | 'endsWith' | 'regex';
+export type SessionAction = 'opened' | 'paused' | 'closed' | 'delete';
 
 // ... resto de las interfaces existentes ...
 // InstanceData,

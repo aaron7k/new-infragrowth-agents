@@ -1,9 +1,10 @@
 import React, { useState } from "react";
-import { PlusCircle, Bot, Loader2, Trash2, Copy, Edit, Check, Link, MessageSquare } from "lucide-react";
+import { PlusCircle, Bot, Loader2, Trash2, Copy, Edit, Check, Link, MessageSquare, Users } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { OpenAIAssistant } from "../types";
 import { DeleteAssistantConfirmationModal } from "./DeleteAssistantConfirmationModal";
 import OpenAIAssistantModal from "./OpenAIAssistantModal";
+import AssistantSessionsModal from "./AssistantSessionsModal";
 import { getOpenAIAssistant } from "../api";
 
 interface OpenAIAssistantsListProps {
@@ -52,6 +53,8 @@ const OpenAIAssistantsList: React.FC<OpenAIAssistantsListProps> = ({
   const [assistantToEdit, setAssistantToEdit] = useState<OpenAIAssistant | null>(null);
   const [isLoadingAssistant, setIsLoadingAssistant] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [sessionsModalOpen, setSessionsModalOpen] = useState(false);
+  const [selectedAssistant, setSelectedAssistant] = useState<OpenAIAssistant | null>(null);
 
   const handleDeleteClick = (assistant: OpenAIAssistant) => {
     setAssistantToDelete(assistant);
@@ -158,6 +161,11 @@ const OpenAIAssistantsList: React.FC<OpenAIAssistantsListProps> = ({
     }
   };
 
+  const handleViewSessions = (assistant: OpenAIAssistant) => {
+    setSelectedAssistant(assistant);
+    setSessionsModalOpen(true);
+  };
+
   // Función para obtener el texto del disparador según el tipo
   const getTriggerText = (assistant: OpenAIAssistant) => {
     switch (assistant.triggerType) {
@@ -229,71 +237,84 @@ const OpenAIAssistantsList: React.FC<OpenAIAssistantsListProps> = ({
         <ul className="divide-y divide-gray-200">
           {assistants.map((assistant) => (
             <li key={assistant.id} className="p-4 hover:bg-gray-50">
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <p className="font-medium text-gray-800">{assistant.name}</p>
-                  
-                  {/* Mostrar el ID del asistente con botón para copiar */}
-                  <div className="flex items-center mt-1">
-                    <p className="text-xs text-gray-500 font-mono bg-gray-100 px-2 py-1 rounded truncate max-w-xs">
-                      {assistant.assistantId || "Sin ID"}
-                    </p>
-                    <button
-                      onClick={() => handleCopyAssistantId(assistant.assistantId || '')}
-                      className="ml-2 text-gray-400 hover:text-purple-600"
-                      title="Copiar ID del asistente"
-                      disabled={!assistant.assistantId}
-                    >
-                      {copiedId === assistant.assistantId ? (
-                        <Check className="w-4 h-4 text-green-500" />
-                      ) : (
-                        <Copy className="w-4 h-4" />
-                      )}
-                    </button>
+              <div className="flex flex-col">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-800">{assistant.name}</p>
+                    
+                    {/* Mostrar el ID del asistente con botón para copiar */}
+                    <div className="flex items-center mt-1">
+                      <p className="text-xs text-gray-500 font-mono bg-gray-100 px-2 py-1 rounded truncate max-w-xs">
+                        {assistant.assistantId || "Sin ID"}
+                      </p>
+                      <button
+                        onClick={() => handleCopyAssistantId(assistant.assistantId || '')}
+                        className="ml-2 text-gray-400 hover:text-purple-600"
+                        title="Copiar ID del asistente"
+                        disabled={!assistant.assistantId}
+                      >
+                        {copiedId === assistant.assistantId ? (
+                          <Check className="w-4 h-4 text-green-500" />
+                        ) : (
+                          <Copy className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
                   </div>
                   
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => handleViewSessions(assistant)}
+                      className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded"
+                      title="Ver sesiones"
+                    >
+                      <Users className="w-5 h-5" />
+                    </button>
+                    
+                    {onEditAssistant && (
+                      <button
+                        onClick={() => handleEditClick(assistant)}
+                        className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded"
+                        title="Editar asistente"
+                        disabled={isLoadingAssistant}
+                      >
+                        {isLoadingAssistant ? (
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : (
+                          <Edit className="w-5 h-5" />
+                        )}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleDeleteClick(assistant)}
+                      className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
+                      title="Eliminar asistente"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Información adicional */}
+                <div className="mt-2">
                   {/* Mostrar webhook de funciones */}
-                  <div className="flex items-center mt-2 text-sm text-gray-600">
-                    <Link className="w-4 h-4 mr-1 text-gray-400" />
-                    <span>
+                  <div className="flex items-center text-sm text-gray-600">
+                    <Link className="w-4 h-4 mr-1 text-gray-400 flex-shrink-0" />
+                    <span className="truncate">
                       {assistant.webhookUrl ? 
-                        <span className="truncate inline-block max-w-xs">{assistant.webhookUrl}</span> : 
+                        assistant.webhookUrl : 
                         <span className="text-gray-400">Sin webhook</span>
                       }
                     </span>
                   </div>
                   
                   {/* Mostrar tipo de disparador */}
-                  <div className="flex items-center mt-1 text-sm text-gray-600">
-                    <MessageSquare className="w-4 h-4 mr-1 text-gray-400" />
+                  <div className="flex items-center text-sm text-gray-600">
+                    <MessageSquare className="w-4 h-4 mr-1 text-gray-400 flex-shrink-0" />
                     <span>
                       Disparador: <span className="font-medium">{getTriggerText(assistant)}</span>
                     </span>
                   </div>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  {onEditAssistant && (
-                    <button
-                      onClick={() => handleEditClick(assistant)}
-                      className="text-blue-500 hover:text-blue-700"
-                      title="Editar asistente"
-                      disabled={isLoadingAssistant}
-                    >
-                      {isLoadingAssistant ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : (
-                        <Edit className="w-5 h-5" />
-                      )}
-                    </button>
-                  )}
-                  <button
-                    onClick={() => handleDeleteClick(assistant)}
-                    className="text-red-500 hover:text-red-700"
-                    title="Eliminar asistente"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
                 </div>
               </div>
             </li>
@@ -322,6 +343,19 @@ const OpenAIAssistantsList: React.FC<OpenAIAssistantsListProps> = ({
           isLoading={isLoadingAssistant}
           initialData={assistantToEdit}
           isEditing={true}
+        />
+      )}
+
+      {selectedAssistant && (
+        <AssistantSessionsModal
+          isOpen={sessionsModalOpen}
+          onClose={() => {
+            setSessionsModalOpen(false);
+            setSelectedAssistant(null);
+          }}
+          instanceName={instanceName}
+          assistantId={selectedAssistant.id}
+          assistantName={selectedAssistant.name}
         />
       )}
     </div>
