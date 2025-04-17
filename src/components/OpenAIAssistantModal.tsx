@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { X, Loader2, HelpCircle } from "lucide-react";
+import { X, Loader2, HelpCircle, Info } from "lucide-react";
 
 interface ApiKeyOption {
   id: string;
@@ -17,7 +17,17 @@ interface OpenAIAssistantModalProps {
     webhookUrl: string,
     triggerType: string,
     triggerCondition?: string,
-    triggerValue?: string
+    triggerValue?: string,
+    expirationMinutes?: number,
+    stopKeyword?: string,
+    messageDelayMs?: number,
+    unknownMessage?: string,
+    listenToOwner?: boolean,
+    stopByOwner?: boolean,
+    keepSessionOpen?: boolean,
+    debounceSeconds?: number,
+    separateMessages?: boolean,
+    secondsPerMessage?: number
   ) => Promise<void>;
   instanceName: string;
   apiKeys: ApiKeyOption[];
@@ -32,6 +42,7 @@ const OpenAIAssistantModal: React.FC<OpenAIAssistantModalProps> = ({
   apiKeys,
   isLoading = false,
 }) => {
+  // Campos básicos
   const [name, setName] = useState("");
   const [instructions, setInstructions] = useState("");
   const [apiKeyId, setApiKeyId] = useState("");
@@ -40,12 +51,27 @@ const OpenAIAssistantModal: React.FC<OpenAIAssistantModalProps> = ({
   const [triggerType, setTriggerType] = useState<string>("all");
   const [triggerCondition, setTriggerCondition] = useState<string>("contains");
   const [triggerValue, setTriggerValue] = useState("");
+  
+  // Campos adicionales
+  const [expirationMinutes, setExpirationMinutes] = useState<number>(60);
+  const [stopKeyword, setStopKeyword] = useState<string>("#stop");
+  const [messageDelayMs, setMessageDelayMs] = useState<number>(1000);
+  const [unknownMessage, setUnknownMessage] = useState<string>("No puedo entender aún este tipo de mensajes");
+  const [listenToOwner, setListenToOwner] = useState<boolean>(true);
+  const [stopByOwner, setStopByOwner] = useState<boolean>(true);
+  const [keepSessionOpen, setKeepSessionOpen] = useState<boolean>(false);
+  const [debounceSeconds, setDebounceSeconds] = useState<number>(2);
+  const [separateMessages, setSeparateMessages] = useState<boolean>(false);
+  const [secondsPerMessage, setSecondsPerMessage] = useState<number>(1);
+  
   const [isSaving, setIsSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [activeTab, setActiveTab] = useState<'basic' | 'advanced'>('basic');
 
   // Resetear los campos cuando se abre el modal
   useEffect(() => {
     if (isOpen) {
+      // Campos básicos
       setName("");
       setInstructions("");
       setApiKeyId("");
@@ -54,7 +80,21 @@ const OpenAIAssistantModal: React.FC<OpenAIAssistantModalProps> = ({
       setTriggerType("all");
       setTriggerCondition("contains");
       setTriggerValue("");
+      
+      // Campos adicionales
+      setExpirationMinutes(60);
+      setStopKeyword("#stop");
+      setMessageDelayMs(1000);
+      setUnknownMessage("No puedo entender aún este tipo de mensajes");
+      setListenToOwner(true);
+      setStopByOwner(true);
+      setKeepSessionOpen(false);
+      setDebounceSeconds(2);
+      setSeparateMessages(false);
+      setSecondsPerMessage(1);
+      
       setErrors({});
+      setActiveTab('basic');
     }
   }, [isOpen]);
 
@@ -79,6 +119,22 @@ const OpenAIAssistantModal: React.FC<OpenAIAssistantModalProps> = ({
       }
     }
     
+    if (expirationMinutes <= 0) {
+      newErrors.expirationMinutes = "El tiempo de expiración debe ser mayor a 0";
+    }
+    
+    if (messageDelayMs < 0) {
+      newErrors.messageDelayMs = "El delay debe ser un valor positivo";
+    }
+    
+    if (debounceSeconds < 0) {
+      newErrors.debounceSeconds = "El debounce debe ser un valor positivo";
+    }
+    
+    if (separateMessages && secondsPerMessage <= 0) {
+      newErrors.secondsPerMessage = "Los segundos por mensaje deben ser mayores a 0";
+    }
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -100,7 +156,17 @@ const OpenAIAssistantModal: React.FC<OpenAIAssistantModalProps> = ({
         webhookUrl, 
         triggerType,
         triggerType === 'keyword' || triggerType === 'advanced' ? triggerCondition : undefined,
-        triggerType === 'keyword' || triggerType === 'advanced' ? triggerValue : undefined
+        triggerType === 'keyword' || triggerType === 'advanced' ? triggerValue : undefined,
+        expirationMinutes,
+        stopKeyword,
+        messageDelayMs,
+        unknownMessage,
+        listenToOwner,
+        stopByOwner,
+        keepSessionOpen,
+        debounceSeconds,
+        separateMessages,
+        separateMessages ? secondsPerMessage : undefined
       );
       onClose();
     } catch (error) {
@@ -114,7 +180,7 @@ const OpenAIAssistantModal: React.FC<OpenAIAssistantModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-xl font-semibold text-purple-900">
             Crear Asistente de OpenAI
@@ -134,180 +200,399 @@ const OpenAIAssistantModal: React.FC<OpenAIAssistantModalProps> = ({
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Instancia
-              </label>
-              <input
-                type="text"
-                value={instanceName}
-                disabled
-                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Nombre del Asistente
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className={`w-full px-3 py-2 border ${
-                  errors.name ? "border-red-500" : "border-gray-300"
-                } rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500`}
-                placeholder="Ej: Asistente de Ventas"
-              />
-              {errors.name && (
-                <p className="text-red-500 text-xs mt-1">{errors.name}</p>
-              )}
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Descripción
-              </label>
-              <textarea
-                value={instructions}
-                onChange={(e) => setInstructions(e.target.value)}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                placeholder="Instrucciones para el asistente..."
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Describe cómo debe comportarse el asistente y qué tipo de respuestas debe dar.
-              </p>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Credencial de OpenAI
-              </label>
-              {apiKeys.length === 0 ? (
-                <div className="text-sm text-red-500">
-                  No hay credenciales disponibles. Añade una credencial primero.
-                </div>
-              ) : (
-                <select
-                  value={apiKeyId}
-                  onChange={(e) => setApiKeyId(e.target.value)}
-                  className={`w-full px-3 py-2 border ${
-                    errors.apiKeyId ? "border-red-500" : "border-gray-300"
-                  } rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500`}
-                >
-                  <option value="">Selecciona una credencial</option>
-                  {apiKeys.map((key) => (
-                    <option key={key.id} value={key.id}>
-                      {key.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-              {errors.apiKeyId && (
-                <p className="text-red-500 text-xs mt-1">{errors.apiKeyId}</p>
-              )}
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                ID del Asistente
-              </label>
-              <input
-                type="text"
-                value={assistantId}
-                onChange={(e) => setAssistantId(e.target.value)}
-                className={`w-full px-3 py-2 border ${
-                  errors.assistantId ? "border-red-500" : "border-gray-300"
-                } rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500`}
-                placeholder="asst_..."
-              />
-              {errors.assistantId && (
-                <p className="text-red-500 text-xs mt-1">{errors.assistantId}</p>
-              )}
-              <p className="text-xs text-gray-500 mt-1 flex items-center">
-                <HelpCircle className="w-3 h-3 mr-1" />
-                ID del asistente creado en OpenAI (comienza con "asst_")
-              </p>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                URL de funciones (webhook)
-              </label>
-              <input
-                type="text"
-                value={webhookUrl}
-                onChange={(e) => setWebhookUrl(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                placeholder="https://..."
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                URL para llamadas a funciones (opcional)
-              </p>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Tipo de disparador
-              </label>
-              <select
-                value={triggerType}
-                onChange={(e) => setTriggerType(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+            {/* Tabs para navegación */}
+            <div className="flex border-b border-gray-200 mb-4">
+              <button
+                type="button"
+                className={`py-2 px-4 font-medium ${
+                  activeTab === 'basic'
+                    ? 'text-purple-600 border-b-2 border-purple-600'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+                onClick={() => setActiveTab('basic')}
               >
-                <option value="all">Todos los mensajes</option>
-                <option value="none">Ninguno (manual)</option>
-                <option value="keyword">Palabra clave</option>
-                <option value="advanced">Avanzado</option>
-              </select>
-              <p className="text-xs text-gray-500 mt-1">
-                Define cuándo se activará el asistente
-              </p>
+                Configuración Básica
+              </button>
+              <button
+                type="button"
+                className={`py-2 px-4 font-medium ${
+                  activeTab === 'advanced'
+                    ? 'text-purple-600 border-b-2 border-purple-600'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+                onClick={() => setActiveTab('advanced')}
+              >
+                Configuración Avanzada
+              </button>
             </div>
-            
-            {(triggerType === 'keyword' || triggerType === 'advanced') && (
+
+            {activeTab === 'basic' ? (
               <>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Condición
+                    Instancia
                   </label>
-                  <select
-                    value={triggerCondition}
-                    onChange={(e) => setTriggerCondition(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  >
-                    <option value="contains">Contiene</option>
-                    <option value="equals">Es igual a</option>
-                    <option value="startsWith">Empieza con</option>
-                    <option value="endsWith">Termina con</option>
-                    <option value="regex">Expresión regular</option>
-                  </select>
+                  <input
+                    type="text"
+                    value={instanceName}
+                    disabled
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+                  />
                 </div>
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Valor del disparador
+                    Nombre del Asistente
                   </label>
                   <input
                     type="text"
-                    value={triggerValue}
-                    onChange={(e) => setTriggerValue(e.target.value)}
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
                     className={`w-full px-3 py-2 border ${
-                      errors.triggerValue ? "border-red-500" : "border-gray-300"
+                      errors.name ? "border-red-500" : "border-gray-300"
                     } rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500`}
-                    placeholder={
-                      triggerCondition === 'regex' 
-                        ? "^hola.*mundo$" 
-                        : triggerType === 'keyword' 
-                          ? "hola" 
-                          : "expresión"
-                    }
+                    placeholder="Ej: Asistente de Ventas"
                   />
-                  {errors.triggerValue && (
-                    <p className="text-red-500 text-xs mt-1">{errors.triggerValue}</p>
+                  {errors.name && (
+                    <p className="text-red-500 text-xs mt-1">{errors.name}</p>
                   )}
                 </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Descripción
+                  </label>
+                  <textarea
+                    value={instructions}
+                    onChange={(e) => setInstructions(e.target.value)}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="Instrucciones para el asistente..."
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Describe cómo debe comportarse el asistente y qué tipo de respuestas debe dar.
+                  </p>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Credencial de OpenAI
+                  </label>
+                  {apiKeys.length === 0 ? (
+                    <div className="text-sm text-red-500">
+                      No hay credenciales disponibles. Añade una credencial primero.
+                    </div>
+                  ) : (
+                    <select
+                      value={apiKeyId}
+                      onChange={(e) => setApiKeyId(e.target.value)}
+                      className={`w-full px-3 py-2 border ${
+                        errors.apiKeyId ? "border-red-500" : "border-gray-300"
+                      } rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                    >
+                      <option value="">Selecciona una credencial</option>
+                      {apiKeys.map((key) => (
+                        <option key={key.id} value={key.id}>
+                          {key.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  {errors.apiKeyId && (
+                    <p className="text-red-500 text-xs mt-1">{errors.apiKeyId}</p>
+                  )}
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    ID del Asistente
+                  </label>
+                  <input
+                    type="text"
+                    value={assistantId}
+                    onChange={(e) => setAssistantId(e.target.value)}
+                    className={`w-full px-3 py-2 border ${
+                      errors.assistantId ? "border-red-500" : "border-gray-300"
+                    } rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                    placeholder="asst_..."
+                  />
+                  {errors.assistantId && (
+                    <p className="text-red-500 text-xs mt-1">{errors.assistantId}</p>
+                  )}
+                  <p className="text-xs text-gray-500 mt-1 flex items-center">
+                    <HelpCircle className="w-3 h-3 mr-1" />
+                    ID del asistente creado en OpenAI (comienza con "asst_")
+                  </p>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    URL de funciones (webhook)
+                  </label>
+                  <input
+                    type="text"
+                    value={webhookUrl}
+                    onChange={(e) => setWebhookUrl(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="https://..."
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    URL para llamadas a funciones (opcional)
+                  </p>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Tipo de disparador
+                  </label>
+                  <select
+                    value={triggerType}
+                    onChange={(e) => setTriggerType(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="all">Todos los mensajes</option>
+                    <option value="none">Ninguno (manual)</option>
+                    <option value="keyword">Palabra clave</option>
+                    <option value="advanced">Avanzado</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Define cuándo se activará el asistente
+                  </p>
+                </div>
+                
+                {(triggerType === 'keyword' || triggerType === 'advanced') && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Condición
+                      </label>
+                      <select
+                        value={triggerCondition}
+                        onChange={(e) => setTriggerCondition(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      >
+                        <option value="contains">Contiene</option>
+                        <option value="equals">Es igual a</option>
+                        <option value="startsWith">Empieza con</option>
+                        <option value="endsWith">Termina con</option>
+                        <option value="regex">Expresión regular</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Valor del disparador
+                      </label>
+                      <input
+                        type="text"
+                        value={triggerValue}
+                        onChange={(e) => setTriggerValue(e.target.value)}
+                        className={`w-full px-3 py-2 border ${
+                          errors.triggerValue ? "border-red-500" : "border-gray-300"
+                        } rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                        placeholder={
+                          triggerCondition === 'regex' 
+                            ? "^hola.*mundo$" 
+                            : triggerType === 'keyword' 
+                              ? "hola" 
+                              : "expresión"
+                        }
+                      />
+                      {errors.triggerValue && (
+                        <p className="text-red-500 text-xs mt-1">{errors.triggerValue}</p>
+                      )}
+                    </div>
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                {/* Configuración avanzada */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Expiración del bot (minutos)
+                    </label>
+                    <input
+                      type="number"
+                      value={expirationMinutes}
+                      onChange={(e) => setExpirationMinutes(parseInt(e.target.value) || 0)}
+                      min="1"
+                      className={`w-full px-3 py-2 border ${
+                        errors.expirationMinutes ? "border-red-500" : "border-gray-300"
+                      } rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                    />
+                    {errors.expirationMinutes && (
+                      <p className="text-red-500 text-xs mt-1">{errors.expirationMinutes}</p>
+                    )}
+                    <p className="text-xs text-gray-500 mt-1">
+                      Tiempo de inactividad antes de finalizar la conversación
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Palabra clave para finalizar
+                    </label>
+                    <input
+                      type="text"
+                      value={stopKeyword}
+                      onChange={(e) => setStopKeyword(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      placeholder="#stop"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Palabra que detiene la conversación con el asistente
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Delay de mensaje (ms)
+                    </label>
+                    <input
+                      type="number"
+                      value={messageDelayMs}
+                      onChange={(e) => setMessageDelayMs(parseInt(e.target.value) || 0)}
+                      min="0"
+                      className={`w-full px-3 py-2 border ${
+                        errors.messageDelayMs ? "border-red-500" : "border-gray-300"
+                      } rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                    />
+                    {errors.messageDelayMs && (
+                      <p className="text-red-500 text-xs mt-1">{errors.messageDelayMs}</p>
+                    )}
+                    <p className="text-xs text-gray-500 mt-1">
+                      Tiempo de espera para simular "escribiendo..."
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Debounce (segundos)
+                    </label>
+                    <input
+                      type="number"
+                      value={debounceSeconds}
+                      onChange={(e) => setDebounceSeconds(parseInt(e.target.value) || 0)}
+                      min="0"
+                      className={`w-full px-3 py-2 border ${
+                        errors.debounceSeconds ? "border-red-500" : "border-gray-300"
+                      } rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                    />
+                    {errors.debounceSeconds && (
+                      <p className="text-red-500 text-xs mt-1">{errors.debounceSeconds}</p>
+                    )}
+                    <p className="text-xs text-gray-500 mt-1">
+                      Tiempo para agrupar mensajes consecutivos del usuario
+                    </p>
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Mensaje Desconocido
+                  </label>
+                  <textarea
+                    value={unknownMessage}
+                    onChange={(e) => setUnknownMessage(e.target.value)}
+                    rows={2}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="No puedo entender aún este tipo de mensajes"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Mensaje que se muestra cuando la IA no entiende el input
+                  </p>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="listenToOwner"
+                      checked={listenToOwner}
+                      onChange={(e) => setListenToOwner(e.target.checked)}
+                      className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                    />
+                    <label htmlFor="listenToOwner" className="ml-2 block text-sm text-gray-700">
+                      Escuchando al dueño
+                    </label>
+                    <div className="ml-2 text-gray-500 cursor-help" title="Activar cuando el humano escribe">
+                      <Info className="h-4 w-4" />
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="stopByOwner"
+                      checked={stopByOwner}
+                      onChange={(e) => setStopByOwner(e.target.checked)}
+                      className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                    />
+                    <label htmlFor="stopByOwner" className="ml-2 block text-sm text-gray-700">
+                      Detener por el dueño
+                    </label>
+                    <div className="ml-2 text-gray-500 cursor-help" title="Detener cuando el humano escribe la palabra clave">
+                      <Info className="h-4 w-4" />
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="keepSessionOpen"
+                      checked={keepSessionOpen}
+                      onChange={(e) => setKeepSessionOpen(e.target.checked)}
+                      className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                    />
+                    <label htmlFor="keepSessionOpen" className="ml-2 block text-sm text-gray-700">
+                      Mantener sesión abierta
+                    </label>
+                    <div className="ml-2 text-gray-500 cursor-help" title="Mantener la conversación activa incluso después de inactividad">
+                      <Info className="h-4 w-4" />
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="separateMessages"
+                      checked={separateMessages}
+                      onChange={(e) => setSeparateMessages(e.target.checked)}
+                      className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                    />
+                    <label htmlFor="separateMessages" className="ml-2 block text-sm text-gray-700">
+                      Separar mensajes de IA
+                    </label>
+                    <div className="ml-2 text-gray-500 cursor-help" title="Dividir respuestas largas en múltiples mensajes">
+                      <Info className="h-4 w-4" />
+                    </div>
+                  </div>
+                </div>
+                
+                {separateMessages && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Segundos por mensaje
+                    </label>
+                    <input
+                      type="number"
+                      value={secondsPerMessage}
+                      onChange={(e) => setSecondsPerMessage(parseInt(e.target.value) || 1)}
+                      min="1"
+                      className={`w-full px-3 py-2 border ${
+                        errors.secondsPerMessage ? "border-red-500" : "border-gray-300"
+                      } rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                    />
+                    {errors.secondsPerMessage && (
+                      <p className="text-red-500 text-xs mt-1">{errors.secondsPerMessage}</p>
+                    )}
+                    <p className="text-xs text-gray-500 mt-1">
+                      Tiempo entre mensajes separados
+                    </p>
+                  </div>
+                )}
               </>
             )}
 

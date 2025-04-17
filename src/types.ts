@@ -75,6 +75,16 @@ export interface OpenAIAssistant {
   triggerType?: TriggerType;
   triggerCondition?: TriggerCondition;
   triggerValue?: string;
+  expirationMinutes?: number;
+  stopKeyword?: string;
+  messageDelayMs?: number;
+  unknownMessage?: string;
+  listenToOwner?: boolean;
+  stopByOwner?: boolean;
+  keepSessionOpen?: boolean;
+  debounceSeconds?: number;
+  separateMessages?: boolean;
+  secondsPerMessage?: number;
 }
 
 export type TriggerType = 'keyword' | 'all' | 'none' | 'advanced';
